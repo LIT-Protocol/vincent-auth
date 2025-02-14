@@ -1,31 +1,27 @@
-import { useState } from 'react';
+import { useState, Dispatch, SetStateAction } from 'react';
 
 import AuthMethods from './AuthMethods';
 import WalletMethods from './WalletMethods';
 import WebAuthn from './WebAuthn';
 import StytchOTP from './StytchOTP';
-import { SELECTED_LIT_NETWORK } from '../utils/lit';
 
 interface SignUpProps {
-  handleGoogleLogin: () => Promise<void>;
-  handleDiscordLogin: () => Promise<void>;
-  authWithEthWallet: any;
-  registerWithWebAuthn: any;
-  authWithWebAuthn: any;
-  authWithStytch: any;
-  goToLogin: any;
+  authWithEthWallet: (address: string) => Promise<void>;
+  authWithWebAuthn: (credentialId: string, userId: string) => Promise<void>;
+  authWithStytch: (sessionJwt: string, userId: string, method: 'email' | 'phone') => Promise<void>;
+  registerWithWebAuthn: (credentialId: string) => Promise<void>;
+  goToLogin: () => void;
   error?: Error;
 }
 
 type AuthView = 'default' | 'email' | 'phone' | 'wallet' | 'webauthn';
+type SetViewFunction = Dispatch<SetStateAction<AuthView>>;
 
 export default function SignUpMethods({
-  handleGoogleLogin,
-  handleDiscordLogin,
   authWithEthWallet,
-  registerWithWebAuthn,
   authWithWebAuthn,
   authWithStytch,
+  registerWithWebAuthn,
   goToLogin,
   error,
 }: SignUpProps) {
@@ -41,17 +37,11 @@ export default function SignUpMethods({
         )}
         {view === 'default' && (
           <>
-            <h1>Get started on the {SELECTED_LIT_NETWORK} network</h1>
+            <h1>Lit Agent Wallet Management</h1>
             <p>
-              Create a wallet that is secured by accounts you already have. With
-              Lit-powered programmable MPC wallets, you won&apos;t have to worry
-              about seed phrases.
+              Create a Lit Agent Wallet that is secured by accounts you already have.
             </p>
-            <AuthMethods
-              handleGoogleLogin={handleGoogleLogin}
-              handleDiscordLogin={handleDiscordLogin}
-              setView={setView}
-            />
+            <AuthMethods setView={setView as Dispatch<SetStateAction<string>>} />
             <div className="buttons-container">
               <button
                 type="button"
@@ -65,30 +55,30 @@ export default function SignUpMethods({
         )}
         {view === 'email' && (
           <StytchOTP
-            method={'email'}
+            method="email"
             authWithStytch={authWithStytch}
-            setView={setView}
+            setView={setView as Dispatch<SetStateAction<string>>}
           />
         )}
         {view === 'phone' && (
           <StytchOTP
-            method={'phone'}
+            method="phone"
             authWithStytch={authWithStytch}
-            setView={setView}
+            setView={setView as Dispatch<SetStateAction<string>>}
           />
         )}
         {view === 'wallet' && (
           <WalletMethods
             authWithEthWallet={authWithEthWallet}
-            setView={setView}
+            setView={setView as Dispatch<SetStateAction<string>>}
           />
         )}
         {view === 'webauthn' && (
           <WebAuthn
-            start={'register'}
+            start="register"
             authWithWebAuthn={authWithWebAuthn}
-            setView={setView}
             registerWithWebAuthn={registerWithWebAuthn}
+            setView={setView as Dispatch<SetStateAction<string>>}
           />
         )}
       </div>

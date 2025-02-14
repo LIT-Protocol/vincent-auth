@@ -44,30 +44,9 @@ export default function MyApp({ Component, pageProps }: AppProps) {
   return (
     <StytchProvider stytch={stytch}>
       <WagmiConfig client={client}>
-        <header>
-          <Image src="/lit.svg" alt="Lit logo" width={32} height={32}></Image>
-          <a
-            href="https://developer.litprotocol.com/?ref=demo.getlit.dev"
-            target="_blank"
-            rel="noopener nofollow"
-            className="lit-cta"
-          >
-            Build on Lit
-          </a>
-        </header>
         <main className={font.className}>
           <Component {...pageProps} />
         </main>
-        <footer>
-          <a
-            href="https://github.com/LIT-Protocol/pkp-social-auth-example"
-            target="_blank"
-            rel="noopener nofollow"
-            className="footer-link"
-          >
-            View the source code
-          </a>
-        </footer>
       </WagmiConfig>
     </StytchProvider>
   );

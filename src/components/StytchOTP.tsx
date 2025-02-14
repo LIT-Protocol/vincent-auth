@@ -40,7 +40,7 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
       setMethodId(response.method_id);
       setStep('verify');
     } catch (err) {
-      setError(err);
+      setError(err as Error);
     } finally {
       setLoading(false);
     }
@@ -56,7 +56,7 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
       });
       await authWithStytch(response.session_jwt, response.user_id, method);
     } catch (err) {
-      setError(err);
+      setError(err as Error);
     } finally {
       setLoading(false);
     }

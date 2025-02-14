@@ -6,10 +6,8 @@ import useAccounts from '../hooks/useAccounts';
 import {
   ORIGIN,
   registerWebAuthn,
-  signInWithDiscord,
-  signInWithGoogle,
 } from '../utils/lit';
-import { AuthMethodType } from '@lit-protocol/constants';
+import { AUTH_METHOD_TYPE } from '@lit-protocol/constants';
 import SignUpMethods from '../components/SignUpMethods';
 import Dashboard from '../components/Dashboard';
 import Loading from '../components/Loading';
@@ -24,7 +22,7 @@ export default function SignUpView() {
     authWithStytch,
     loading: authLoading,
     error: authError,
-  } = useAuthenticate(redirectUri);
+  } = useAuthenticate();
   const {
     createAccount,
     setCurrentAccount,
@@ -56,14 +54,6 @@ export default function SignUpView() {
     }
   }
 
-  async function handleGoogleLogin() {
-    await signInWithGoogle(redirectUri);
-  }
-
-  async function handleDiscordLogin() {
-    await signInWithDiscord(redirectUri);
-  }
-
   async function registerWithWebAuthn() {
     const newPKP = await registerWebAuthn();
     if (newPKP) {
@@ -74,7 +64,7 @@ export default function SignUpView() {
   useEffect(() => {
     // If user is authenticated, create an account
     // For WebAuthn, the account creation is handled by the registerWithWebAuthn function
-    if (authMethod && authMethod.authMethodType !== AuthMethodType.WebAuthn) {
+    if (authMethod && authMethod.authMethodType !== AUTH_METHOD_TYPE.WebAuthn) {
       router.replace(window.location.pathname, undefined, { shallow: true });
       createAccount(authMethod);
     }
@@ -108,8 +98,6 @@ export default function SignUpView() {
   } else {
     return (
       <SignUpMethods
-        handleGoogleLogin={handleGoogleLogin}
-        handleDiscordLogin={handleDiscordLogin}
         authWithEthWallet={authWithEthWallet}
         registerWithWebAuthn={registerWithWebAuthn}
         authWithWebAuthn={authWithWebAuthn}

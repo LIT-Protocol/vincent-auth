@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, Dispatch, SetStateAction } from 'react';
 
 import AuthMethods from './AuthMethods';
 import WalletMethods from './WalletMethods';
@@ -6,20 +6,17 @@ import WebAuthn from './WebAuthn';
 import StytchOTP from './StytchOTP';
 
 interface LoginProps {
-  handleGoogleLogin: () => Promise<void>;
-  handleDiscordLogin: () => Promise<void>;
-  authWithEthWallet: any;
-  authWithWebAuthn: any;
-  authWithStytch: any;
-  signUp: any;
+  authWithEthWallet: (address: string) => Promise<void>;
+  authWithWebAuthn: (credentialId: string, userId: string) => Promise<void>;
+  authWithStytch: (sessionJwt: string, userId: string, method: 'email' | 'phone') => Promise<void>;
+  signUp: () => void;
   error?: Error;
 }
 
 type AuthView = 'default' | 'email' | 'phone' | 'wallet' | 'webauthn';
+type SetViewFunction = Dispatch<SetStateAction<AuthView>>;
 
 export default function LoginMethods({
-  handleGoogleLogin,
-  handleDiscordLogin,
   authWithEthWallet,
   authWithWebAuthn,
   authWithStytch,
@@ -38,13 +35,9 @@ export default function LoginMethods({
         )}
         {view === 'default' && (
           <>
-            <h1>Welcome back</h1>
-            <p>Access your Lit wallet.</p>
-            <AuthMethods
-              handleGoogleLogin={handleGoogleLogin}
-              handleDiscordLogin={handleDiscordLogin}
-              setView={setView}
-            />
+            <h1>Lit Agent Wallet Management</h1>
+            <p>Access your Lit Agent Wallet.</p>
+            <AuthMethods setView={setView as Dispatch<SetStateAction<string>>} />
             <div className="buttons-container">
               <button type="button" className="btn btn--link" onClick={signUp}>
                 Need an account? Sign up
@@ -54,29 +47,29 @@ export default function LoginMethods({
         )}
         {view === 'email' && (
           <StytchOTP
-            method={'email'}
+            method="email"
             authWithStytch={authWithStytch}
-            setView={setView}
+            setView={setView as Dispatch<SetStateAction<string>>}
           />
         )}
         {view === 'phone' && (
           <StytchOTP
-            method={'phone'}
+            method="phone"
             authWithStytch={authWithStytch}
-            setView={setView}
+            setView={setView as Dispatch<SetStateAction<string>>}
           />
         )}
         {view === 'wallet' && (
           <WalletMethods
             authWithEthWallet={authWithEthWallet}
-            setView={setView}
+            setView={setView as Dispatch<SetStateAction<string>>}
           />
         )}
         {view === 'webauthn' && (
           <WebAuthn
-            start={'authenticate'}
+            start="authenticate"
             authWithWebAuthn={authWithWebAuthn}
-            setView={setView}
+            setView={setView as Dispatch<SetStateAction<string>>}
           />
         )}
       </div>

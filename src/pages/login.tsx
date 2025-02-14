@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 import useAuthenticate from '../hooks/useAuthenticate';
 import useSession from '../hooks/useSession';
 import useAccounts from '../hooks/useAccounts';
-import { ORIGIN, signInWithDiscord, signInWithGoogle } from '../utils/lit';
+import { ORIGIN } from '../utils/lit';
 import Dashboard from '../components/Dashboard';
 import Loading from '../components/Loading';
 import LoginMethods from '../components/LoginMethods';
@@ -11,7 +11,8 @@ import AccountSelection from '../components/AccountSelection';
 import CreateAccount from '../components/CreateAccount';
 
 export default function LoginView() {
-  const redirectUri = ORIGIN + '/login';
+  const router = useRouter();
+  const { appId } = router.query;
 
   const {
     authMethod,
@@ -20,7 +21,7 @@ export default function LoginView() {
     authWithStytch,
     loading: authLoading,
     error: authError,
-  } = useAuthenticate(redirectUri);
+  } = useAuthenticate();
   const {
     fetchAccounts,
     setCurrentAccount,
@@ -35,17 +36,8 @@ export default function LoginView() {
     loading: sessionLoading,
     error: sessionError,
   } = useSession();
-  const router = useRouter();
 
   const error = authError || accountsError || sessionError;
-
-  async function handleGoogleLogin() {
-    await signInWithGoogle(redirectUri);
-  }
-
-  async function handleDiscordLogin() {
-    await signInWithDiscord(redirectUri);
-  }
 
   function goToSignUp() {
     router.push('/');
@@ -54,10 +46,12 @@ export default function LoginView() {
   useEffect(() => {
     // If user is authenticated, fetch accounts
     if (authMethod) {
-      router.replace(window.location.pathname, undefined, { shallow: true });
+      // Preserve appId in the URL when replacing the pathname
+      const query = appId ? { appId } : undefined;
+      router.replace({ pathname: window.location.pathname, query }, undefined, { shallow: true });
       fetchAccounts(authMethod);
     }
-  }, [authMethod, fetchAccounts]);
+  }, [authMethod, fetchAccounts, appId]);
 
   useEffect(() => {
     // If user is authenticated and has selected an account, initialize session
@@ -106,8 +100,6 @@ export default function LoginView() {
   // If user is not authenticated, show login methods
   return (
     <LoginMethods
-      handleGoogleLogin={handleGoogleLogin}
-      handleDiscordLogin={handleDiscordLogin}
       authWithEthWallet={authWithEthWallet}
       authWithWebAuthn={authWithWebAuthn}
       authWithStytch={authWithStytch}

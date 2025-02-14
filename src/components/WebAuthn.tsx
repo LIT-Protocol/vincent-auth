@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { registerWebAuthn } from '../utils/lit';
 
 type WebAuthnStep = 'register' | 'authenticate';
 
@@ -28,7 +27,7 @@ export default function WebAuthn({
       setStep('authenticate');
     } catch (err) {
       console.error(err);
-      setError(err);
+      setError(err as Error);
     }
     setLoading(false);
   }
