@@ -85,7 +85,7 @@ export default function useAuthenticate() {
         const result: AuthMethod = (await authenticateWithStytch(
           accessToken,
           userId,
-          method
+          method as "sms" | "email"
         )) as any;
         setAuthMethod(result);
       } catch (err) {

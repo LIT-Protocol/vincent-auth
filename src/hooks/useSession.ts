@@ -45,7 +45,7 @@ export default function useSession() {
 
         setSessionSigs(sessionSigs);
       } catch (err) {
-        setError(err);
+        setError(err as Error);
       } finally {
         setLoading(false);
       }

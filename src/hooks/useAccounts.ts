@@ -2,7 +2,6 @@ import { useCallback, useState } from 'react';
 import { AuthMethod } from '@lit-protocol/types';
 import { getPKPs, mintPKP } from '../utils/lit';
 import { IRelayPKP } from '@lit-protocol/types';
-import { verify } from 'crypto';
 
 export default function useAccounts() {
   const [accounts, setAccounts] = useState<IRelayPKP[]>([]);
@@ -27,7 +26,7 @@ export default function useAccounts() {
           setCurrentAccount(myPKPs[0]);
         }
       } catch (err) {
-        setError(err);
+        setError(err as Error);
       } finally {
         setLoading(false);
       }
@@ -49,7 +48,7 @@ export default function useAccounts() {
         setAccounts(prev => [...prev, newPKP]);
         setCurrentAccount(newPKP);
       } catch (err) {
-        setError(err);
+        setError(err as Error);
       } finally {
         setLoading(false);
       }
