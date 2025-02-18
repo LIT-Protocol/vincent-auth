@@ -57,11 +57,11 @@ export default function Dashboard({
         </button>
       </div>
       <h1>Agent Consent Notice</h1>
-      <div className="details-card">
-        <p>My address: {currentAccount.ethAddress.toLowerCase()}</p>
-      </div>
-      <div className="divider"></div>
-      <ConsentForm onSubmit={handleFormSubmit} onDisapprove={handleLogout} />
+      <ConsentForm 
+        onSubmit={handleFormSubmit} 
+        onDisapprove={handleLogout}
+        userAddress={currentAccount.ethAddress}
+      />
     </div>
   );
 }

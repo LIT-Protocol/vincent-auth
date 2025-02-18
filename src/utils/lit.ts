@@ -170,7 +170,12 @@ export async function registerWebAuthn(): Promise<IRelayPKP> {
   };
 
   console.log('newUserPKP', newUserPKP);
-  return newUserPKP;
+
+  // Mint a new PKP to be controlled by the new user PKP
+  const newUserPKP2 = await mintPKPToExistingPKP(newUserPKP);
+  console.log('newUserPKP2', newUserPKP2);
+
+  return newUserPKP2;
 }
 
 /**
@@ -382,10 +387,14 @@ export async function mintPKPToExistingPKP(pkp: IRelayPKP): Promise<IRelayPKP> {
     throw new Error("PKP ownership verification failed");
   }
 
+  // Get the public key and eth address from the PKP NFT contract
+  const publicKey = await pkpNft.getPubkey(tokenId);
+  const ethAddress = ethers.utils.computeAddress(publicKey);
+
   const agentPKP: IRelayPKP = {
-    tokenId: agentMintResponseJson.pkpTokenId,
-    publicKey: agentMintResponseJson.pkpPublicKey,
-    ethAddress: agentMintResponseJson.pkpEthAddress,
+    tokenId: tokenId.toString(),
+    publicKey,
+    ethAddress,
   };
 
   return agentPKP;

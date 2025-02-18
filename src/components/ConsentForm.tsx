@@ -3,6 +3,11 @@ import { useRouter } from 'next/router';
 import { useUrlAppId } from '../hooks/useUrlAppId';
 import { useAppDatabase } from '../hooks/useAppDatabase';
 import { AppInfo } from '../utils/db';
+import { ethers } from 'ethers';
+import { getPkpNftContract } from '../utils/get-pkp-nft-contract';
+import { SELECTED_LIT_NETWORK } from '../utils/lit';
+import { LIT_RPC } from '@lit-protocol/constants';
+import { IRelayPKP } from '@lit-protocol/types';
 
 export interface ConsentFormData {
   delegatees: string[];
@@ -16,9 +21,15 @@ export interface ConsentFormData {
 interface ConsentFormProps {
   onSubmit: (data: ConsentFormData) => Promise<void>;
   onDisapprove: () => void;
+  userAddress: string;
+  agentAddress?: string;
 }
 
-export default function ConsentForm({ onSubmit, onDisapprove }: ConsentFormProps) {
+export default function ConsentForm({ 
+  onSubmit, 
+  onDisapprove, 
+  userAddress,
+}: ConsentFormProps) {
   const { appId, error: appIdError } = useUrlAppId();
   const { getApplicationByAppId, loading: dbLoading, error: dbError } = useAppDatabase();
   const [formData, setFormData] = useState<ConsentFormData | null>(null);
@@ -28,6 +39,7 @@ export default function ConsentForm({ onSubmit, onDisapprove }: ConsentFormProps
   const [showDisapproval, setShowDisapproval] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [editingPrefix, setEditingPrefix] = useState<string>('');
+  const [agentPKP, setAgentPKP] = useState<IRelayPKP | null>(null);
 
   // Fetch app info from database
   useEffect(() => {
@@ -66,6 +78,45 @@ export default function ConsentForm({ onSubmit, onDisapprove }: ConsentFormProps
       mounted = false;
     };
   }, [appId, getApplicationByAppId]);
+
+  // Fetch agent PKP owned by the user
+  useEffect(() => {
+    const fetchAgentPKP = async () => {
+      try {
+        const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
+        const pkpNftContract = getPkpNftContract(SELECTED_LIT_NETWORK);
+        
+        // Get the balance of PKPs owned by the user's address
+        const balance = await pkpNftContract.balanceOf(userAddress);
+        
+        // Fetch each PKP's details
+        for (let i = 0; i < balance.toNumber(); i++) {
+          const tokenId = await pkpNftContract.tokenOfOwnerByIndex(userAddress, i);
+          const pubKey = await pkpNftContract.getPubkey(tokenId);
+          const ethAddress = await pkpNftContract.getEthAddress(tokenId);
+          
+          // Skip if this PKP is the controller (user's address)
+          if (ethAddress.toLowerCase() === userAddress.toLowerCase()) {
+            continue;
+          }
+          
+          // We found the agent PKP
+          setAgentPKP({
+            tokenId: tokenId.toString(),
+            publicKey: pubKey,
+            ethAddress: ethAddress,
+          });
+          break;
+        }
+      } catch (err) {
+        console.error('Error fetching agent PKP:', err);
+      }
+    };
+
+    if (userAddress) {
+      fetchAgentPKP();
+    }
+  }, [userAddress]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -215,6 +266,18 @@ export default function ConsentForm({ onSubmit, onDisapprove }: ConsentFormProps
             <div className="verified-text">Verified</div>
           )}
           <p className="app-description">{appInfo.metadata.description}</p>
+          <div className="address-info">
+            <p className="address-item">
+              <span className="address-label">My address:</span>
+              <span className="address-value">{userAddress.toLowerCase()}</span>
+            </p>
+            {agentPKP && (
+              <p className="address-item">
+                <span className="address-label">Agent address:</span>
+                <span className="address-value">{agentPKP.ethAddress.toLowerCase()}</span>
+              </p>
+            )}
+          </div>
         </div>
 
         <div className="permissions-section">

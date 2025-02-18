@@ -1139,3 +1139,33 @@ p.message-card__prompt {
   font-size: 0.875rem;
   margin-bottom: 0.75rem;
 }
+
+.address-info {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 8px;
+}
+
+.address-item {
+  margin: 0.5rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.address-label {
+  font-weight: 600;
+  color: #495057;
+  font-size: 0.875rem;
+}
+
+.address-value {
+  font-family: monospace;
+  color: #2c3e50;
+  word-break: break-all;
+  background: #fff;
+  padding: 0.5rem;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
