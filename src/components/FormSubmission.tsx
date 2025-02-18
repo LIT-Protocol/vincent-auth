@@ -1,6 +1,6 @@
 import { IRelayPKP, SessionSigs } from '@lit-protocol/types';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
-import { litNodeClient } from '../utils/lit';
+import { litNodeClient, mintPKPToExistingPKP } from '../utils/lit';
 import type { ConsentFormData } from './ConsentForm';
 import { ethers, ContractTransaction, ContractReceipt } from 'ethers';
 import { getPkpToolRegistryContract } from '../utils/get-pkp-tool-registry-contract';
@@ -231,6 +231,13 @@ export default function FormSubmission({
           console.log(`Policy parameters already correct for delegatee ${delegatee}`);
         }
       }
+
+      // ----------------------------------------------------------------
+      // Step 6: Mint a new PKP to be controlled by the current PKP
+      // ----------------------------------------------------------------
+      console.log('Minting new PKP to be controlled by the current PKP...');
+      const newPKP = await mintPKPToExistingPKP(currentAccount);
+      console.log('Successfully minted new PKP:', newPKP);
 
       // ----------------------------
       // Final state verification

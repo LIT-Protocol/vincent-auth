@@ -11,6 +11,7 @@ import {
   AUTH_METHOD_TYPE,
   LIT_ABILITY,
   LIT_NETWORK,
+  LIT_RPC,
 } from '@lit-protocol/constants';
 import {
   AuthMethod,
@@ -20,6 +21,8 @@ import {
   LIT_NETWORKS_KEYS,
 } from '@lit-protocol/types';
 import { LitPKPResource } from '@lit-protocol/auth-helpers';
+import { ethers } from 'ethers';
+import { getPkpNftContract } from './get-pkp-nft-contract';
 
 export const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || 'localhost';
 export const ORIGIN =
@@ -43,6 +46,7 @@ const litRelay = new LitRelay({
   relayUrl: LitRelay.getRelayUrl(SELECTED_LIT_NETWORK),
   relayApiKey: 'test-api-key',
 });
+console.log('litRelay', litRelay);
 
 /**
  * Setting all available providers
@@ -154,17 +158,19 @@ export async function registerWebAuthn(): Promise<IRelayPKP> {
   }
 
   // Verify registration and mint PKP through relay server
-  const txHash = await webAuthnProvider.verifyAndMintPKPThroughRelayer(options);
-  const response = await webAuthnProvider.relay.pollRequestUntilTerminalState(txHash);
-  if (response.status !== 'Succeeded' || !response.pkpTokenId || !response.pkpPublicKey || !response.pkpEthAddress) {
+  const userTxHash = await webAuthnProvider.verifyAndMintPKPThroughRelayer(options);
+  const userResponse = await webAuthnProvider.relay.pollRequestUntilTerminalState(userTxHash);
+  if (userResponse.status !== 'Succeeded' || !userResponse.pkpTokenId || !userResponse.pkpPublicKey || !userResponse.pkpEthAddress) {
     throw new Error('Minting failed: Invalid response data');
   }
-  const newPKP: IRelayPKP = {
-    tokenId: response.pkpTokenId,
-    publicKey: response.pkpPublicKey,
-    ethAddress: response.pkpEthAddress,
+  const newUserPKP: IRelayPKP = {
+    tokenId: userResponse.pkpTokenId,
+    publicKey: userResponse.pkpPublicKey,
+    ethAddress: userResponse.pkpEthAddress,
   };
-  return newPKP;
+
+  console.log('newUserPKP', newUserPKP);
+  return newUserPKP;
 }
 
 /**
@@ -226,11 +232,25 @@ export async function updateSessionSigs(
 }
 
 /**
- * Fetch PKPs associated with given auth method
+ * Fetch PKPs associated with given auth method, minting one if none exist
  */
 export async function getPKPs(authMethod: AuthMethod): Promise<IRelayPKP[]> {
   const provider = getAuthenticatedProvider(authMethod);
-  const allPKPs = await provider.fetchPKPsThroughRelayer(authMethod);
+  let allPKPs = await provider.fetchPKPsThroughRelayer(authMethod);
+  console.log('Initial PKPs:', allPKPs);
+
+  // If no PKPs found and not WebAuthn (which handles registration separately),
+  // automatically mint one
+  if (allPKPs.length === 0 && authMethod.authMethodType !== AUTH_METHOD_TYPE.WebAuthn) {
+    console.log('No PKPs found, minting new one...');
+    const newPKP = await mintPKP(authMethod);
+    console.log('Minted new PKP:', newPKP);
+
+    // Fetch PKPs again to get the complete list
+    allPKPs = await provider.fetchPKPsThroughRelayer(authMethod);
+    console.log('Final PKPs:', allPKPs);
+  }
+
   return allPKPs;
 }
 
@@ -246,18 +266,8 @@ export async function mintPKP(authMethod: AuthMethod): Promise<IRelayPKP> {
 
   let txHash: string;
 
-  if (authMethod.authMethodType === AUTH_METHOD_TYPE.WebAuthn) {
-    // WebAuthn provider requires different steps
-    const webAuthnProvider = provider as WebAuthnProvider;
-    // Register new WebAuthn credential
-    const webAuthnInfo = await webAuthnProvider.register();
-
-    // Verify registration and mint PKP through relay server
-    txHash = await webAuthnProvider.verifyAndMintPKPThroughRelayer(webAuthnInfo, options);
-  } else {
-    // Mint PKP through relay server
-    txHash = await provider.mintPKPThroughRelayer(authMethod, options);
-  }
+  // Mint PKP through relay server
+  txHash = await provider.mintPKPThroughRelayer(authMethod, options);
 
   let attempts = 3;
   let response = null;
@@ -301,4 +311,82 @@ export async function mintPKP(authMethod: AuthMethod): Promise<IRelayPKP> {
   };
 
   return newPKP;
+}
+
+/**
+ * Mint a PKP to be controlled by an existing PKP
+ */
+export async function mintPKPToExistingPKP(pkp: IRelayPKP): Promise<IRelayPKP> {
+  console.log('Minting PKP to existing PKP:', pkp);
+  
+  const requestBody = {
+    keyType: "2",
+    permittedAuthMethodTypes: ["2"],
+    permittedAuthMethodIds: [
+      pkp.tokenId,
+    ],
+    permittedAuthMethodPubkeys: ["0x"],
+    permittedAuthMethodScopes: [["1"]],
+    addPkpEthAddressAsPermittedAddress: true,
+    sendPkpToItself: false,
+    burnPkp: false,
+    sendToAddressAfterMinting: pkp.ethAddress,
+  };
+
+  const agentMintResponse = await fetch('https://datil-dev-relayer.getlit.dev/mint-next-and-add-auth-methods', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': 'test-api-key'
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!agentMintResponse.ok) {
+    throw new Error('Failed to mint PKP to existing PKP');
+  }
+
+  const agentMintResponseJson = await agentMintResponse.json();
+  console.log('Agent mint response:', agentMintResponseJson);
+
+  // Wait for transaction and verify
+  const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
+  const txReceipt = await provider.waitForTransaction(agentMintResponseJson.requestId);
+  
+  if (txReceipt.status !== 1) {
+    throw new Error('Transaction failed');
+  }
+
+  // Get the token ID from the transaction logs
+  const pkpNft = getPkpNftContract(SELECTED_LIT_NETWORK);
+  const mintEvent = txReceipt.logs.find((log) => {
+    try {
+      return pkpNft.interface.parseLog(log).name === "PKPMinted";
+    } catch {
+      return false;
+    }
+  });
+
+  if (!mintEvent) {
+    throw new Error("Failed to find PKPMinted event in transaction logs");
+  }
+
+  const tokenId = pkpNft.interface.parseLog(mintEvent).args.tokenId;
+  if (!tokenId) {
+    throw new Error("Token ID not found in mint event");
+  }
+
+  // Verify ownership
+  const owner = await pkpNft.ownerOf(tokenId);
+  if (owner.toLowerCase() !== requestBody.sendToAddressAfterMinting.toLowerCase()) {
+    throw new Error("PKP ownership verification failed");
+  }
+
+  const agentPKP: IRelayPKP = {
+    tokenId: agentMintResponseJson.pkpTokenId,
+    publicKey: agentMintResponseJson.pkpPublicKey,
+    ethAddress: agentMintResponseJson.pkpEthAddress,
+  };
+
+  return agentPKP;
 }

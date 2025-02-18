@@ -8,7 +8,6 @@ import { MetaMaskConnector } from 'wagmi/connectors/metaMask';
 import { StytchProvider } from '@stytch/nextjs';
 import { createStytchUIClient } from '@stytch/nextjs/ui';
 import { Albert_Sans } from 'next/font/google';
-import Image from 'next/image';
 
 const { provider, chains } = configureChains(
   [mainnet, goerli, optimism],

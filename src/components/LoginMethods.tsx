@@ -9,18 +9,17 @@ interface LoginProps {
   authWithEthWallet: (address: string) => Promise<void>;
   authWithWebAuthn: (credentialId: string, userId: string) => Promise<void>;
   authWithStytch: (sessionJwt: string, userId: string, method: 'email' | 'phone') => Promise<void>;
-  signUp: () => void;
+  registerWithWebAuthn?: (credentialId: string) => Promise<void>;
   error?: Error;
 }
 
 type AuthView = 'default' | 'email' | 'phone' | 'wallet' | 'webauthn';
-type SetViewFunction = Dispatch<SetStateAction<AuthView>>;
 
 export default function LoginMethods({
   authWithEthWallet,
   authWithWebAuthn,
   authWithStytch,
-  signUp,
+  registerWithWebAuthn,
   error,
 }: LoginProps) {
   const [view, setView] = useState<AuthView>('default');
@@ -36,13 +35,8 @@ export default function LoginMethods({
         {view === 'default' && (
           <>
             <h1>Lit Agent Wallet Management</h1>
-            <p>Access your Lit Agent Wallet.</p>
+            <p>Access or create your Lit Agent Wallet.</p>
             <AuthMethods setView={setView as Dispatch<SetStateAction<string>>} />
-            <div className="buttons-container">
-              <button type="button" className="btn btn--link" onClick={signUp}>
-                Need an account? Sign up
-              </button>
-            </div>
           </>
         )}
         {view === 'email' && (
@@ -67,8 +61,8 @@ export default function LoginMethods({
         )}
         {view === 'webauthn' && (
           <WebAuthn
-            start="authenticate"
             authWithWebAuthn={authWithWebAuthn}
+            registerWithWebAuthn={registerWithWebAuthn}
             setView={setView as Dispatch<SetStateAction<string>>}
           />
         )}
