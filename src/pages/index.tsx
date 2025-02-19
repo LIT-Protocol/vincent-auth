@@ -93,7 +93,7 @@ export default function IndexView() {
           <div className="container">
             <div className="wrapper">
               <h1>No Accounts Found</h1>
-              <p>You don't have any accounts associated with this WebAuthn credential.</p>
+              <p>You don&apos;t have any accounts associated with this WebAuthn credential.</p>
               <div className="auth-options">
                 <div className="auth-option">
                   <button
@@ -144,7 +144,7 @@ export default function IndexView() {
           <div className="container">
             <div className="wrapper">
               <h1>Unsupported Authentication Method</h1>
-              <p>The authentication method you're using is not supported.</p>
+              <p>The authentication method you&apos;re using is not supported.</p>
               <button
                 type="button"
                 className="btn btn--outline"
