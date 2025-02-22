@@ -1,10 +1,12 @@
 import { IRelayPKP, SessionSigs } from '@lit-protocol/types';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
-import { litNodeClient, mintPKPToExistingPKP } from '../utils/lit';
+import { litNodeClient, mintPKPToExistingPKP, getSessionSigs, SELECTED_LIT_NETWORK } from '../utils/lit';
 import type { ConsentFormData } from './ConsentForm';
-import { ethers, ContractTransaction, ContractReceipt } from 'ethers';
+import { ethers } from 'ethers';
 import { getPkpToolRegistryContract } from '../utils/get-pkp-tool-registry-contract';
 import { LIT_RPC } from "@lit-protocol/constants";
+import { EthWalletProvider } from '@lit-protocol/lit-auth-client';
+import { getPkpNftContract } from '../utils/get-pkp-nft-contract';
 
 interface FormSubmissionProps {
   currentAccount: IRelayPKP;
@@ -41,6 +43,7 @@ interface ToolWithPolicy {
 }
 
 interface PolicyParameter {
+  name: string;
   value: string;
 }
 
@@ -50,52 +53,94 @@ export default function FormSubmission({
   formData,
   onSuccess,
 }: FormSubmissionProps) {
+  // Helper function to estimate gas with a 20% buffer.
+  async function estimateGasLimit(method: (...args: any[]) => Promise<any>, ...args: any[]) {
+    const gasEstimate = await method(...args);
+    // Add 20% buffer to the gas estimate.
+    return gasEstimate.mul(120).div(100);
+  }
+
   const handleFormSubmission = async (): Promise<VerificationData> => {
     try {
-      // Convert tokenId to BigNumber for consistency
-      const tokenId = ethers.BigNumber.from(currentAccount.tokenId);
+      // Use the agent PKP tokenId (from formData.agentPKP) for contract calls.
+      const tokenId = ethers.BigNumber.from(formData.agentPKP.tokenId);
+      console.log("Original tokenId value:", formData.agentPKP.tokenId);
+      console.log("Converted tokenId (BigNumber):", tokenId.toString());
       
-      console.log('Starting form submission with data:', {
-        tokenId: tokenId.toHexString(),
-        delegatees: formData.delegatees.map((d: string) => ethers.utils.getAddress(d)),
-        policies: formData.policies,
-        tools: formData.tools,
-        policyParameters: formData.policyParameters
-      });
-
-      // Connect to the Lit Node
+      // Connect to the Lit Node.
+      console.log('Connecting to Lit Node...');
       await litNodeClient.connect();
       console.log('Connected to Lit Node');
 
-      // Initialize the PKP wallet
-      const pkpWallet = new PKPEthersWallet({
+      // Initialize the user PKP wallet (used for authentication and for owner-only calls).
+      console.log('Initializing user PKP wallet...');
+      const userPkpWallet = new PKPEthersWallet({
         controllerSessionSigs: sessionSigs,
         pkpPubKey: currentAccount.publicKey,
         litNodeClient,
       });
-      await pkpWallet.init();
-      console.log('PKP wallet initialized');
+      await userPkpWallet.init();
+      console.log('User PKP wallet initialized');
+      console.log('User PKP details:', currentAccount);
+      console.log('Agent PKP details:', formData.agentPKP);
 
-      // Assign a provider so that the PKP wallet can send transactions
+      // Authenticate with EthWalletProvider using the user PKP.
+      console.log('Authenticating with EthWalletProvider...');
+      const authMethod = await EthWalletProvider.authenticate({
+        signer: userPkpWallet,
+        litNodeClient
+      });
+      console.log('Authentication method:', authMethod);
+
+      // Derive session signatures for the agent PKP.
+      console.log('Getting session signatures for Agent PKP...');
+      const agentPkpSessionSigs = await getSessionSigs({
+        pkpPublicKey: formData.agentPKP.publicKey,
+        authMethod
+      });
+      console.log('Agent PKP session sigs:', agentPkpSessionSigs);
+      
+      // (Optional) Initialize the agent PKP wallet if needed for other operations.
+      console.log('Initializing Agent PKP wallet...');
+      const agentPkpWallet = new PKPEthersWallet({
+        controllerSessionSigs: agentPkpSessionSigs,
+        pkpPubKey: formData.agentPKP.publicKey,
+        litNodeClient,
+      });
+      await agentPkpWallet.init();
+      console.log('Agent PKP wallet initialized');
+      console.log('Agent PKP wallet address:', agentPkpWallet.address);
+
+      // Assign a provider so that the wallets can send transactions.
       const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
-      pkpWallet.provider = provider;
+      userPkpWallet.provider = provider;
+      agentPkpWallet.provider = provider;
+      console.log('Provider assigned to wallets:', provider.connection.url);
 
-      // Get the contract instance (provider-only)
+      // Get the contract instance (provider-only).
+      console.log('Fetching PKP Tool Registry contract instance...');
       const contract = await getPkpToolRegistryContract('datil-dev');
       console.log('Contract instance created at:', contract.address);
 
-      // Validate delegatee addresses
-      const validDelegatees = formData.delegatees.map((d: string) => ethers.utils.getAddress(d));
+      // Validate delegatee addresses.
+      const validDelegatees = formData.delegatees.map((d: string) => {
+        const validAddress = ethers.utils.getAddress(d);
+        console.log('Validated delegatee address:', validAddress);
+        return validAddress;
+      });
 
-      // Connect the contract to the PKP wallet so it can sign transactions
-      const contractWithSigner = contract.connect(pkpWallet);
-
+      // For calls requiring owner privileges (registerTools, addDelegatees, permitToolsForDelegatees),
+      // connect the contract with the user PKP wallet.
+      const contractWithOwnerSigner = contract.connect(userPkpWallet);
+      
       // -------------------------------------------
-      // Step 1: Check and register tools if needed
+      // Step 1: Check and register tools if needed.
       // -------------------------------------------
-      console.log('Checking tool registration status...');
+      console.log('Step 1: Checking tool registration status...');
       const toolRegistrationPromises = formData.tools.map(async tool => {
+        console.log(`Checking registration for tool: ${tool} with tokenId: ${tokenId.toString()}`);
         const [isRegistered, isEnabled] = await contract.isToolRegistered(tokenId, tool);
+        console.log(`Tool ${tool} - isRegistered: ${isRegistered}, isEnabled: ${isEnabled}`);
         return { tool, isRegistered, isEnabled } as ToolRegistrationStatus;
       });
       const toolRegistrationStatus = await Promise.all(toolRegistrationPromises);
@@ -103,168 +148,217 @@ export default function FormSubmission({
       const unregisteredTools = toolRegistrationStatus
         .filter(status => !status.isRegistered || !status.isEnabled)
         .map(status => status.tool);
+      console.log('Unregistered or disabled tools:', unregisteredTools);
 
       if (unregisteredTools.length > 0) {
-        console.log('Registering new tools:', unregisteredTools);
-        // Call registerTools directly via the signer
-        const tx = await contractWithSigner.registerTools(tokenId, unregisteredTools, true, { gasLimit: 500000 });
-        console.log('Tool registration tx sent:', tx.hash);
+        console.log('Step 1: Registering new tools:', unregisteredTools);
+        console.log("Parameters: tokenId:", tokenId.toString(), "tools:", unregisteredTools, "enabled: true");
+
+        const gasLimit = await estimateGasLimit(
+          contractWithOwnerSigner.estimateGas.registerTools,
+          tokenId,
+          unregisteredTools,
+          true
+        );
+        const tx = await contractWithOwnerSigner.registerTools(tokenId, unregisteredTools, true, { gasLimit });
+        console.log('Tool registration transaction sent. Tx hash:', tx.hash);
         const receipt = await tx.wait();
-        console.log('New tools registered successfully, receipt:', receipt);
+        console.log('Tool registration receipt:', receipt);
       } else {
-        console.log('All tools already registered and enabled');
+        console.log('Step 1: All tools are already registered and enabled');
       }
 
       // -----------------------------------------------
-      // Step 2: Check and add delegatees if needed
+      // Step 2: Check and add delegatees if needed.
       // -----------------------------------------------
-      console.log('Checking delegatee status...');
+      console.log('Step 2: Checking delegatee status...');
       const currentDelegatees = await contract.getDelegatees(tokenId);
+      console.log('Current delegatees on contract:', currentDelegatees);
       const newDelegatees = validDelegatees.filter(
         delegatee => !currentDelegatees.map((d: string) => d.toLowerCase()).includes(delegatee.toLowerCase())
       );
+      console.log('Delegatees to be added:', newDelegatees);
 
       if (newDelegatees.length > 0) {
-        console.log('Adding new delegatees:', newDelegatees);
-        const delegateeTx = await contractWithSigner.addDelegatees(tokenId, newDelegatees, { gasLimit: 500000 });
-        await delegateeTx.wait();
-        console.log('New delegatees added successfully');
+        console.log('Step 2: Adding new delegatees:', newDelegatees);
+        console.log("Parameters: tokenId:", tokenId.toString(), "delegatees:", newDelegatees);
+
+        const gasLimit = await estimateGasLimit(
+          contractWithOwnerSigner.estimateGas.addDelegatees,
+          tokenId,
+          newDelegatees
+        );
+        const delegateeTx = await contractWithOwnerSigner.addDelegatees(tokenId, newDelegatees, { gasLimit });
+        console.log('Delegatee addition transaction sent. Tx hash:', delegateeTx.hash);
+        const delegateeReceipt = await delegateeTx.wait();
+        console.log('Delegatee addition receipt:', delegateeReceipt);
       } else {
-        console.log('All delegatees already added');
+        console.log('Step 2: All delegatees are already added');
       }
 
       // -------------------------------------------------------
-      // Step 3: Check and permit tools for delegatees if needed
+      // Step 3: Check and permit tools for delegatees if needed.
       // -------------------------------------------------------
-      console.log('Checking tool permissions...');
+      console.log('Step 3: Checking tool permissions for delegatees...');
       const permissionChecks = await Promise.all(
         validDelegatees.map(async (delegatee: string) => {
+          console.log(`Fetching permitted tools for delegatee: ${delegatee} with tokenId: ${tokenId.toString()}`);
           const permittedTools = await contract.getPermittedToolsForDelegatee(tokenId, delegatee);
           const permittedToolCids = permittedTools.map((t: ToolWithPolicy) => t.toolIpfsCid);
+          console.log(`Delegatee ${delegatee} has permitted tools:`, permittedToolCids);
           return {
             delegatee,
             toolsToPermit: formData.tools.filter((tool: string) => !permittedToolCids.includes(tool))
           } as PermissionCheck;
         })
       );
+      console.log('Permission check results:', permissionChecks);
 
-      // For each delegatee, set permission for each tool that is not yet permitted.
       for (const check of permissionChecks) {
         for (const tool of check.toolsToPermit) {
-          console.log(`Setting tool permission for delegatee ${check.delegatee} and tool ${tool}...`);
-          // Here we use the contract function (adjust the function name if needed)
-          const tx = await contractWithSigner.permitToolsForDelegatees(tokenId, [tool], [check.delegatee], { gasLimit: 500000 });
-          console.log('Permission tx sent:', tx.hash);
+          console.log(`Step 3: Setting tool permission for delegatee ${check.delegatee} and tool ${tool}...`);
+          console.log("Parameters: tokenId:", tokenId.toString(), "tool:", tool, "delegatee:", check.delegatee);
+          const gasLimit = await estimateGasLimit(
+            contractWithOwnerSigner.estimateGas.permitToolsForDelegatees,
+            tokenId,
+            [tool],
+            [check.delegatee]
+          );
+          const tx = await contractWithOwnerSigner.permitToolsForDelegatees(tokenId, [tool], [check.delegatee], { gasLimit });
+          console.log('Permission transaction sent. Tx hash:', tx.hash);
           const receipt = await tx.wait();
-          console.log(`Tool permission set for delegatee ${check.delegatee} and tool ${tool}, receipt:`, receipt);
+          console.log(`Permission receipt for delegatee ${check.delegatee} and tool ${tool}:`, receipt);
         }
       }
 
       // --------------------------------------------------------
-      // Step 4: Check and set tool policies for delegatees if needed
+      // Step 4: Check and set tool policies for delegatees if needed.
       // --------------------------------------------------------
-      console.log('Checking policy status...');
+      console.log('Step 4: Checking tool policies...');
       const toolsWithPolicies = await contract.getToolsWithPolicy(tokenId);
+      console.log('Tools with policies currently:', toolsWithPolicies);
       const policyUpdatesNeeded = validDelegatees.some((delegatee: string) =>
         !toolsWithPolicies.some((tool: ToolWithPolicy) =>
           tool.delegatees.map((d: string) => d.toLowerCase()).includes(delegatee.toLowerCase()) &&
           formData.policies.every(policy => tool.delegateesPolicyIpfsCids.includes(policy))
         )
       );
+      console.log('Policy updates needed:', policyUpdatesNeeded);
 
       if (policyUpdatesNeeded) {
-        console.log('Setting tool policies...');
-        const policyTx = await contractWithSigner.setToolPoliciesForDelegatees(
+        console.log('Step 4: Setting tool policies...');
+        console.log("Parameters: tokenId:", tokenId.toString(), "tools:", formData.tools, "delegatees:", validDelegatees, "policies:", formData.policies);
+        const gasLimit = await estimateGasLimit(
+          contractWithOwnerSigner.estimateGas.setToolPoliciesForDelegatees,
+          tokenId,
+          formData.tools,
+          validDelegatees,
+          formData.policies,
+          true
+        );
+        const policyTx = await contractWithOwnerSigner.setToolPoliciesForDelegatees(
           tokenId,
           formData.tools,
           validDelegatees,
           formData.policies,
           true,
-          { gasLimit: 500000 }
+          { gasLimit }
         );
-        await policyTx.wait();
-        console.log('Tool policies set successfully');
+        console.log('Policy setting transaction sent. Tx hash:', policyTx.hash);
+        const policyReceipt = await policyTx.wait();
+        console.log('Policy setting receipt:', policyReceipt);
       } else {
-        console.log('All policies already set correctly');
+        console.log('Step 4: All policies are already set correctly');
       }
 
       // ----------------------------------------------------------------
-      // Step 5: Check and set policy parameters for each delegatee if needed
+      // Step 5: Check and set policy parameters for each delegatee if needed.
       // ----------------------------------------------------------------
       for (const delegatee of validDelegatees) {
-        console.log(`Checking policy parameters for delegatee ${delegatee}...`);
-        
-        const parameterNames = formData.policyParameters.prefixes.map((_, i) => `prefix${i + 1}`);
-        const currentParameters = await contract.getToolPolicyParameters(
-          tokenId,
-          formData.tools[0],
-          delegatee,
-          parameterNames
-        );
-
-        // Decode current parameter values (assuming they are encoded as strings)
-        const currentPrefixes = currentParameters.map((param: PolicyParameter) =>
-          ethers.utils.defaultAbiCoder.decode(['string'], param.value)[0]
-        );
-        
-        const prefixesMatch = formData.policyParameters.prefixes.every(
-          (prefix, i) => currentPrefixes[i] === prefix
-        );
-
-        if (!prefixesMatch) {
-          console.log(`Updating policy parameters for delegatee ${delegatee}...`);
-          const prefixValues = formData.policyParameters.prefixes.map(prefix => 
-            ethers.utils.defaultAbiCoder.encode(['string'], [prefix])
-          );
-
-          const paramTx = await contractWithSigner.setToolPolicyParametersForDelegatee(
+        for (const [paramType, paramValues] of Object.entries(formData.parameters)) {
+          console.log(`Step 5: Checking ${paramType} parameters for delegatee ${delegatee}...`);
+          const parameterNames = paramValues.map((_, i) => `${paramType}${i + 1}`);
+          console.log(`Parameter names for delegatee ${delegatee}:`, parameterNames);
+          
+          const currentParameters = await contract.getToolPolicyParameters(
             tokenId,
             formData.tools[0],
             delegatee,
-            parameterNames,
-            prefixValues,
-            { gasLimit: 500000 }
+            parameterNames
           );
-          await paramTx.wait();
-          console.log(`Policy parameters updated for delegatee ${delegatee}`);
-        } else {
-          console.log(`Policy parameters already correct for delegatee ${delegatee}`);
+          console.log(`Raw policy parameters for delegatee ${delegatee}:`, currentParameters);
+
+          const currentValues = currentParameters.map((param: PolicyParameter) =>
+            ethers.utils.defaultAbiCoder.decode(['string'], param.value)[0]
+          );
+          console.log(`Decoded current values for delegatee ${delegatee}:`, currentValues);
+          
+          const valuesMatch = paramValues.every(
+            (value, i) => currentValues[i] === value
+          );
+          console.log(`Do current values match expected for delegatee ${delegatee}?`, valuesMatch);
+
+          if (!valuesMatch) {
+            console.log(`Step 5: Updating ${paramType} parameters for delegatee ${delegatee}...`);
+            const encodedValues = paramValues.map(value => 
+              ethers.utils.defaultAbiCoder.encode(['string'], [value])
+            );
+            console.log(`Encoded values for delegatee ${delegatee}:`, encodedValues);
+
+            const gasLimit = await estimateGasLimit(
+              contractWithOwnerSigner.estimateGas.setToolPolicyParametersForDelegatee,
+              tokenId,
+              formData.tools[0],
+              delegatee,
+              parameterNames,
+              encodedValues
+            );
+            const paramTx = await contractWithOwnerSigner.setToolPolicyParametersForDelegatee(
+              tokenId,
+              formData.tools[0],
+              delegatee,
+              parameterNames,
+              encodedValues,
+              { gasLimit }
+            );
+            console.log(`${paramType} parameter update transaction sent. Tx hash:`, paramTx.hash);
+            const paramReceipt = await paramTx.wait();
+            console.log(`${paramType} parameters update receipt for delegatee ${delegatee}:`, paramReceipt);
+          } else {
+            console.log(`Step 5: ${paramType} parameters already correct for delegatee ${delegatee}`);
+          }
         }
       }
-
-      // ----------------------------------------------------------------
-      // Step 6: Mint a new PKP to be controlled by the current PKP
-      // ----------------------------------------------------------------
-      console.log('Minting new PKP to be controlled by the current PKP...');
-      const newPKP = await mintPKPToExistingPKP(currentAccount);
-      console.log('Successfully minted new PKP:', newPKP);
-
+      
       // ----------------------------
-      // Final state verification
+      // Final state verification.
       // ----------------------------
+      console.log('Performing final state verification...');
       const verificationData = await Promise.all([
         contract.getDelegatees(tokenId),
         contract.getAllRegisteredTools(tokenId),
         contract.getToolsWithPolicy(tokenId),
-        ...validDelegatees.map(delegatee => 
-          contract.getToolPolicyParameters(
-            tokenId,
-            formData.tools[0],
-            delegatee,
-            formData.policyParameters.prefixes.map((_, i) => `prefix${i + 1}`)
+        ...validDelegatees.flatMap(delegatee => 
+          Object.entries(formData.parameters).map(([paramType, paramValues]) =>
+            contract.getToolPolicyParameters(
+              tokenId,
+              formData.tools[0],
+              delegatee,
+              paramValues.map((_, i) => `${paramType}${i + 1}`)
+            )
           )
         )
       ]);
 
-      console.log('Final state verification:', {
+      console.log('Final state verification data:', {
         delegatees: verificationData[0],
         registeredTools: verificationData[1],
         toolsWithPolicies: verificationData[2],
         policyParameters: verificationData.slice(3)
       });
 
-      // Call onSuccess callback if provided
       if (onSuccess) {
+        console.log('Calling onSuccess callback...');
         await onSuccess();
       }
 
@@ -285,7 +379,7 @@ export default function FormSubmission({
         errorMessage: (error as any).message,
         errorReason: (error as any).reason,
         errorData: (error as any).data,
-        tokenId: currentAccount.tokenId,
+        tokenId: formData.agentPKP.tokenId,
         delegatees: formData.delegatees
       });
       throw error;

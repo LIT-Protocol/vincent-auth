@@ -20,7 +20,7 @@ import {
   SessionSigs,
   LIT_NETWORKS_KEYS,
 } from '@lit-protocol/types';
-import { LitPKPResource } from '@lit-protocol/auth-helpers';
+import { LitActionResource, LitPKPResource } from '@lit-protocol/auth-helpers';
 import { ethers } from 'ethers';
 import { getPkpNftContract } from './get-pkp-nft-contract';
 
@@ -207,18 +207,23 @@ export async function authenticateWithStytch(
 export async function getSessionSigs({
   pkpPublicKey,
   authMethod,
-  sessionSigsParams,
 }: {
   pkpPublicKey: string;
   authMethod: AuthMethod;
-  sessionSigsParams: GetSessionSigsProps;
 }): Promise<SessionSigs> {
   await litNodeClient.connect();
   const sessionSigs = await litNodeClient.getPkpSessionSigs({
-    ...sessionSigsParams,
+    chain: 'ethereum',
+    expiration: new Date(
+      Date.now() + 1000 * 60 * 60 * 24 
+    ).toISOString(), // 1 day
     pkpPublicKey,
     authMethods: [authMethod],
     resourceAbilityRequests: [
+      {
+        resource: new LitActionResource('*'),
+        ability: LIT_ABILITY.LitActionExecution,
+      },
       {
         resource: new LitPKPResource('*'),
         ability: LIT_ABILITY.PKPSigning,

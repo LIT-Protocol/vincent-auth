@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useUrlAppId } from '../hooks/useUrlAppId';
 import { useAppDatabase } from '../hooks/useAppDatabase';
-import { AppInfo } from '../utils/db';
+import { AppInfo, ParameterConfig } from '../utils/db';
 import { ethers } from 'ethers';
 import { getPkpNftContract } from '../utils/get-pkp-nft-contract';
 import { SELECTED_LIT_NETWORK } from '../utils/lit';
@@ -13,8 +13,13 @@ export interface ConsentFormData {
   delegatees: string[];
   policies: string[];
   tools: string[];
-  policyParameters: {
-    prefixes: string[];
+  agentPKP: {
+    tokenId: string;
+    publicKey: string;
+    ethAddress: string;
+  };
+  parameters: {
+    [key: string]: string[];  // Generic parameters map where key is parameter type and value is array of values
   };
 }
 
@@ -38,36 +43,38 @@ export default function ConsentForm({
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const [showDisapproval, setShowDisapproval] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [editingPrefix, setEditingPrefix] = useState<string>('');
-  const [agentPKP, setAgentPKP] = useState<IRelayPKP | null>(null);
+  const [editingParameter, setEditingParameter] = useState<{ [key: string]: string }>({});
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Fetch app info from database
   useEffect(() => {
     let mounted = true;
 
     async function fetchAppInfo() {
-      if (!appId) return;
+      if (!appId || !mounted) return;
 
       try {
-        console.log('Fetching app info for appId:', appId);
+        setIsLoading(true);
         const app = await getApplicationByAppId(appId);
-        console.log('Fetched app:', app);
         
         if (mounted && app) {
           setAppInfo(app);
           setFormData({
             delegatees: [app.appManagementAddress],
             policies: app.policies.map(p => p.id),
-            tools: [app.toolId],
-            policyParameters: {
-              prefixes: [...(app.defaultPrefixes || [])]
+            tools: app.tools,
+            parameters: {
+              ...(app.defaultParameters || {})
             }
-          });
+          } as ConsentFormData);
         }
       } catch (err) {
-        console.error('Error fetching app info:', err);
         if (mounted) {
           setError(err instanceof Error ? err.message : 'Failed to fetch app info');
+        }
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
         }
       }
     }
@@ -77,46 +84,7 @@ export default function ConsentForm({
     return () => {
       mounted = false;
     };
-  }, [appId, getApplicationByAppId]);
-
-  // Fetch agent PKP owned by the user
-  useEffect(() => {
-    const fetchAgentPKP = async () => {
-      try {
-        const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
-        const pkpNftContract = getPkpNftContract(SELECTED_LIT_NETWORK);
-        
-        // Get the balance of PKPs owned by the user's address
-        const balance = await pkpNftContract.balanceOf(userAddress);
-        
-        // Fetch each PKP's details
-        for (let i = 0; i < balance.toNumber(); i++) {
-          const tokenId = await pkpNftContract.tokenOfOwnerByIndex(userAddress, i);
-          const pubKey = await pkpNftContract.getPubkey(tokenId);
-          const ethAddress = await pkpNftContract.getEthAddress(tokenId);
-          
-          // Skip if this PKP is the controller (user's address)
-          if (ethAddress.toLowerCase() === userAddress.toLowerCase()) {
-            continue;
-          }
-          
-          // We found the agent PKP
-          setAgentPKP({
-            tokenId: tokenId.toString(),
-            publicKey: pubKey,
-            ethAddress: ethAddress,
-          });
-          break;
-        }
-      } catch (err) {
-        console.error('Error fetching agent PKP:', err);
-      }
-    };
-
-    if (userAddress) {
-      fetchAgentPKP();
-    }
-  }, [userAddress]);
+  }, [appId]); // Only depend on appId
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,14 +94,52 @@ export default function ConsentForm({
     setError(null);
 
     try {
-      await onSubmit(formData);
+      // Fetch agent PKP at submission time
+      const pkpNftContract = getPkpNftContract(SELECTED_LIT_NETWORK);
+      const balance = await pkpNftContract.balanceOf(userAddress);
+      let agentPKP = null;
+
+      // Fetch each PKP's details
+      for (let i = 0; i < balance.toNumber(); i++) {
+        const tokenId = await pkpNftContract.tokenOfOwnerByIndex(userAddress, i);
+        const pubKey = await pkpNftContract.getPubkey(tokenId);
+        const ethAddress = await pkpNftContract.getEthAddress(tokenId);
+        
+        // Skip if this PKP is the controller (user's address)
+        if (ethAddress.toLowerCase() === userAddress.toLowerCase()) {
+          continue;
+        }
+        
+        // We found the agent PKP
+        agentPKP = {
+          tokenId: tokenId.toString(),
+          publicKey: pubKey,
+          ethAddress: ethAddress
+        };
+        break;
+      }
+
+      if (!agentPKP) {
+        throw new Error('No agent PKP found for this user');
+      }
+
+      // Submit form data with agent PKP
+      await onSubmit({
+        ...formData,
+        agentPKP: {
+          tokenId: agentPKP.tokenId,
+          publicKey: agentPKP.publicKey,
+          ethAddress: agentPKP.ethAddress
+        },
+      });
+      
       setShowSuccess(true);
-      setSubmitting(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to submit form');
+    } finally {
       setSubmitting(false);
     }
-  }, [formData, onSubmit]);
+  }, [formData, onSubmit, userAddress]);
 
   const handleDisapprove = useCallback(async () => {
     setShowDisapproval(true);
@@ -141,40 +147,41 @@ export default function ConsentForm({
     setTimeout(onDisapprove, 2000);
   }, [onDisapprove]);
 
-  const handlePrefixChange = (index: number, value: string) => {
+  const handleParameterChange = (parameterType: string, index: number, value: string) => {
     if (!formData) return;
-    const newPrefixes = [...formData.policyParameters.prefixes];
-    newPrefixes[index] = value;
+    const newParams = { ...formData.parameters };
+    if (!newParams[parameterType]) {
+      newParams[parameterType] = [];
+    }
+    newParams[parameterType][index] = value;
     setFormData({
       ...formData,
-      policyParameters: {
-        ...formData.policyParameters,
-        prefixes: newPrefixes
-      }
+      parameters: newParams
     });
   };
 
-  const handleAddPrefix = () => {
-    if (!formData || !editingPrefix.trim()) return;
+  const handleAddParameter = (parameterType: string, value: string) => {
+    if (!formData || !value.trim()) return;
+    const newParams = { ...formData.parameters };
+    if (!newParams[parameterType]) {
+      newParams[parameterType] = [];
+    }
+    newParams[parameterType] = [...newParams[parameterType], value.trim()];
     setFormData({
       ...formData,
-      policyParameters: {
-        ...formData.policyParameters,
-        prefixes: [...formData.policyParameters.prefixes, editingPrefix.trim()]
-      }
+      parameters: newParams
     });
-    setEditingPrefix('');
   };
 
-  const handleRemovePrefix = (index: number) => {
+  const handleRemoveParameter = (parameterType: string, index: number) => {
     if (!formData) return;
-    const newPrefixes = formData.policyParameters.prefixes.filter((_, i) => i !== index);
+    const newParams = { ...formData.parameters };
+    if (newParams[parameterType]) {
+      newParams[parameterType] = newParams[parameterType].filter((_, i) => i !== index);
+    }
     setFormData({
       ...formData,
-      policyParameters: {
-        ...formData.policyParameters,
-        prefixes: newPrefixes
-      }
+      parameters: newParams
     });
   };
 
@@ -271,19 +278,13 @@ export default function ConsentForm({
               <span className="address-label">My address:</span>
               <span className="address-value">{userAddress.toLowerCase()}</span>
             </p>
-            {agentPKP && (
-              <p className="address-item">
-                <span className="address-label">Agent address:</span>
-                <span className="address-value">{agentPKP.ethAddress.toLowerCase()}</span>
-              </p>
-            )}
           </div>
         </div>
 
         <div className="permissions-section">
           <h3>This app would like to:</h3>
           <ul className="permissions-list">
-            {appInfo.tools.map((tool, index) => (
+            {appInfo.toolDescriptions.map((tool, index) => (
               <li key={`tool-${index}`}>{tool}</li>
             ))}
           </ul>
@@ -298,50 +299,74 @@ export default function ConsentForm({
           </ul>
         </div>
 
-        <div className="prefixes-section">
-          <h3>Allowed Message Prefixes:</h3>
-          <p className="prefix-description">Messages must start with one of these prefixes to be signed</p>
-          
-          <div className="prefix-list">
-            {formData?.policyParameters.prefixes.map((prefix, index) => (
-              <div key={`prefix-${index}`} className="prefix-item">
+        {/* Render parameter sections dynamically based on app configuration */}
+        {appInfo.parameters && Object.entries(appInfo.parameters).map(([paramType, paramConfig]: [string, ParameterConfig]) => (
+          <div key={paramType} className="parameters-section">
+            <h3>{paramConfig.title}</h3>
+            <p className="parameter-description">{paramConfig.description}</p>
+            
+            <div className="parameter-list">
+              {formData?.parameters[paramType]?.map((param, index) => (
+                <div key={`${paramType}-${index}`} className="parameter-item">
+                  <input
+                    type={paramConfig.type === 'number' ? 'number' : 'text'}
+                    value={param}
+                    onChange={(e) => handleParameterChange(paramType, index, e.target.value)}
+                    className="parameter-input"
+                    placeholder={`Enter ${paramConfig.itemLabel || 'value'}`}
+                    min={paramConfig.validation?.min}
+                    max={paramConfig.validation?.max}
+                    pattern={paramConfig.validation?.pattern}
+                  />
+                  {/* Only show remove button for multiple values or non-first items */}
+                  {paramConfig.isMultiple && (
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveParameter(paramType, index)}
+                      className="btn btn--icon btn--error"
+                      aria-label={`Remove ${paramConfig.itemLabel || 'parameter'}`}
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {/* Only show add section for multiple values */}
+            {paramConfig.isMultiple && (
+              <div className="parameter-add">
                 <input
-                  type="text"
-                  value={prefix}
-                  onChange={(e) => handlePrefixChange(index, e.target.value)}
-                  className="prefix-input"
-                  placeholder="Enter prefix"
+                  type={paramConfig.type === 'number' ? 'number' : 'text'}
+                  value={editingParameter[paramType] || ''}
+                  onChange={(e) => setEditingParameter({
+                    ...editingParameter,
+                    [paramType]: e.target.value
+                  })}
+                  className="parameter-input"
+                  placeholder={`Add new ${paramConfig.itemLabel || 'value'}`}
+                  min={paramConfig.validation?.min}
+                  max={paramConfig.validation?.max}
+                  pattern={paramConfig.validation?.pattern}
                 />
                 <button
                   type="button"
-                  onClick={() => handleRemovePrefix(index)}
-                  className="btn btn--icon btn--error"
-                  aria-label="Remove prefix"
+                  onClick={() => {
+                    handleAddParameter(paramType, editingParameter[paramType] || '');
+                    setEditingParameter({
+                      ...editingParameter,
+                      [paramType]: ''
+                    });
+                  }}
+                  className="btn btn--primary"
+                  disabled={!editingParameter[paramType]?.trim()}
                 >
-                  ×
+                  Add {paramConfig.itemLabel || 'Value'}
                 </button>
               </div>
-            ))}
+            )}
           </div>
-
-          <div className="prefix-add">
-            <input
-              type="text"
-              value={editingPrefix}
-              onChange={(e) => setEditingPrefix(e.target.value)}
-              className="prefix-input"
-              placeholder="Add new prefix"
-            />
-            <button
-              type="button"
-              onClick={handleAddPrefix}
-              className="btn btn--primary"
-              disabled={!editingPrefix.trim()}
-            >
-              Add Prefix
-            </button>
-          </div>
-        </div>
+        ))}
 
         <div className="support-info">
           <p>Need help? Contact: <a href={`mailto:${appInfo.supportEmail}`}>{appInfo.supportEmail}</a></p>
