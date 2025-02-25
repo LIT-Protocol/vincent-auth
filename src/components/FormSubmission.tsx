@@ -1,10 +1,12 @@
 import { IRelayPKP, SessionSigs } from '@lit-protocol/types';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { litNodeClient, mintPKPToExistingPKP, getSessionSigs, SELECTED_LIT_NETWORK } from '../utils/lit';
+import { LitContracts } from '@lit-protocol/contracts-sdk';
 import type { ConsentFormData } from './ConsentForm';
 import { ethers } from 'ethers';
-import { getPkpToolRegistryContract } from '../utils/get-pkp-tool-registry-contract';
-import { LIT_RPC } from "@lit-protocol/constants";
+import { getAgentRegistryContract } from '../utils/get-agent-registry-contract';
+import { getAppDelegationRegistryContract } from '../utils/get-app-delegation-registry';
+import { LIT_RPC, AUTH_METHOD_SCOPE } from "@lit-protocol/constants";
 import { EthWalletProvider } from '@lit-protocol/lit-auth-client';
 import { getPkpNftContract } from '../utils/get-pkp-nft-contract';
 
@@ -15,15 +17,13 @@ interface FormSubmissionProps {
   onSuccess?: () => void | Promise<void>;
 }
 
-interface ToolRegistrationStatus {
-  tool: string;
-  isRegistered: boolean;
-  isEnabled: boolean;
-}
-
-interface PermissionCheck {
-  delegatee: string;
-  toolsToPermit: string[];
+interface dbResponse {
+  appManager: string;
+  roleId: string;
+  roleVersion: string;
+  toolIpfsCids: string[];
+  policyParamNames: string[];
+  policyValues: string[];
 }
 
 interface VerificationData {
@@ -57,9 +57,9 @@ export default function FormSubmission({
   const handleFormSubmission = async (): Promise<VerificationData> => {
     try {
       // Use the agent PKP tokenId (from formData.agentPKP) for contract calls.
-      const tokenId = ethers.BigNumber.from(formData.agentPKP.tokenId);
+      const tokenId = (ethers.BigNumber.from(formData.agentPKP.tokenId)).toString();
       console.log("Original tokenId value:", formData.agentPKP.tokenId);
-      console.log("Converted tokenId (BigNumber):", tokenId.toString());
+      console.log("Converted tokenId (BigNumber):", tokenId);
       
       // Connect to the Lit Node.
       console.log('Connecting to Lit Node...');
@@ -110,6 +110,42 @@ export default function FormSubmission({
       userPkpWallet.provider = provider;
       agentPkpWallet.provider = provider;
       console.log('Provider assigned to wallets:', provider.connection.url);
+
+
+      const agentRegistryContract = await getAgentRegistryContract();
+      agentRegistryContract.connect(userPkpWallet);
+      /* API CALL HERE */
+      /*
+      const dbResponse: dbResponse;
+
+      const gasLimit = await estimateGasLimit(
+        agentRegistryContract.estimateGas.addRole,
+        tokenId,
+        dbResponse.appManager,
+        dbResponse.roleId,
+        dbResponse.roleVersion,
+        dbResponse.toolIpfsCids,
+        dbResponse.policyParamNames,
+        dbResponse.policyValues
+      );
+
+      const tx = await agentRegistryContract.addRole(tokenId, dbResponse.appManager, dbResponse.roleId, dbResponse.roleVersion, dbResponse.toolIpfsCids, dbResponse.policyParamNames, dbResponse.policyValues, { gasLimit }); */
+
+      const litContracts = new LitContracts({
+        network: SELECTED_LIT_NETWORK,
+        signer: userPkpWallet,
+      });
+      await litContracts.connect();
+
+
+      // forEach here on the toolCids
+      const actionTx = await litContracts.addPermittedAction({
+        authMethodScopes: [AUTH_METHOD_SCOPE.SignAnything],
+        ipfsId: "QmYst8wyhiDqaqUZRU6AiWtjoL9PNsdDyep4CAzaWEwf3a",//
+        pkpTokenId: tokenId
+      })
+
+      console.log("actionTx", actionTx);
 
       if (onSuccess) {
         console.log('Calling onSuccess callback...');

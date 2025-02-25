@@ -1,27 +1,31 @@
-import { useState, useEffect } from 'react';
-import { AppInfo, initDB, getAppByAppId } from '../utils/db';
+import { useState } from 'react';
 
-let isDbInitialized = false;
+interface AppData {
+  _id: string;
+  contactEmail: string;
+  description: string;
+  managementWallet: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
+}
+
+export interface AppInfo {
+  data: AppData;
+  success: boolean;
+}
 
 export function useAppDatabase() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error>();
 
-  useEffect(() => {
-    // Only initialize database once across all hook instances
-    if (!isDbInitialized) {
-      isDbInitialized = true;
-      initDB().catch(err => {
-        console.error('Failed to initialize database:', err);
-        setError(err);
-      });
-    }
-  }, []);
-
   const getApplicationByAppId = async (appId: string): Promise<AppInfo | undefined> => {
     try {
       setLoading(true);
-      return await getAppByAppId(appId);
+      const getAppResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/appMetadata/${appId}`);
+      const data = await getAppResponse.json();
+      return data;
     } catch (err) {
       console.error('Error fetching app:', err);
       setError(err as Error);

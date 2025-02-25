@@ -5,6 +5,11 @@ interface UrlAppIdResult {
   error: string | null;
 }
 
+// Function to validate Ethereum address
+const isValidEthereumAddress = (address: string): boolean => {
+  return /^0x[a-fA-F0-9]{40}$/.test(address);
+};
+
 export function useUrlAppId(): UrlAppIdResult {
   const [appId, setAppId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -14,13 +19,13 @@ export function useUrlAppId(): UrlAppIdResult {
     const urlAppId = params.get('appId');
     
     if (!urlAppId) {
-      setError('No AppId provided');
+      setError('No Ethereum address provided');
       setAppId(null);
       return;
     }
 
-    if (urlAppId !== '123' && urlAppId !== '456') {
-      setError('Invalid AppId');
+    if (!isValidEthereumAddress(urlAppId)) {
+      setError('Invalid Ethereum address format');
       setAppId(null);
       return;
     }

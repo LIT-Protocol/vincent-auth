@@ -14,6 +14,9 @@ importers:
       '@lit-protocol/constants':
         specifier: ^7.0.0
         version: 7.0.6(typescript@5.3.3)
+      '@lit-protocol/contracts-sdk':
+        specifier: ^7.0.6
+        version: 7.0.6(typescript@5.3.3)
       '@lit-protocol/lit-auth-client':
         specifier: ^7.0.0
         version: 7.0.6(@walletconnect/modal@2.7.0(@types/react@18.0.31)(react@18.2.0))(typescript@5.3.3)

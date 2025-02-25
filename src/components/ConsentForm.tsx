@@ -2,24 +2,19 @@ import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
 import { useUrlAppId } from '../hooks/useUrlAppId';
 import { useAppDatabase } from '../hooks/useAppDatabase';
-import { AppInfo, ParameterConfig } from '../utils/db';
 import { ethers } from 'ethers';
 import { getPkpNftContract } from '../utils/get-pkp-nft-contract';
 import { SELECTED_LIT_NETWORK } from '../utils/lit';
 import { LIT_RPC } from '@lit-protocol/constants';
 import { IRelayPKP } from '@lit-protocol/types';
+import type { AppInfo } from '../hooks/useAppDatabase';
 
 export interface ConsentFormData {
   delegatees: string[];
-  policies: string[];
-  tools: string[];
   agentPKP: {
     tokenId: string;
     publicKey: string;
     ethAddress: string;
-  };
-  parameters: {
-    [key: string]: string[];  // Generic parameters map where key is parameter type and value is array of values
   };
 }
 
@@ -27,7 +22,6 @@ interface ConsentFormProps {
   onSubmit: (data: ConsentFormData) => Promise<void>;
   onDisapprove: () => void;
   userAddress: string;
-  agentAddress?: string;
 }
 
 export default function ConsentForm({ 
@@ -43,7 +37,6 @@ export default function ConsentForm({
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const [showDisapproval, setShowDisapproval] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [editingParameter, setEditingParameter] = useState<{ [key: string]: string }>({});
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
   // Fetch app info from database
@@ -57,16 +50,16 @@ export default function ConsentForm({
         setIsLoading(true);
         const app = await getApplicationByAppId(appId);
         
-        if (mounted && app) {
+        if (mounted && app && app.success) {
           setAppInfo(app);
           setFormData({
-            delegatees: [app.appManagementAddress],
-            policies: app.policies.map(p => p.id),
-            tools: app.tools,
-            parameters: {
-              ...(app.defaultParameters || {})
+            delegatees: [app.data.managementWallet],
+            agentPKP: {
+              tokenId: '',
+              publicKey: '',
+              ethAddress: ''
             }
-          } as ConsentFormData);
+          });
         }
       } catch (err) {
         if (mounted) {
@@ -84,7 +77,7 @@ export default function ConsentForm({
     return () => {
       mounted = false;
     };
-  }, [appId]); // Only depend on appId
+  }, [appId]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -126,11 +119,7 @@ export default function ConsentForm({
       // Submit form data with agent PKP
       await onSubmit({
         ...formData,
-        agentPKP: {
-          tokenId: agentPKP.tokenId,
-          publicKey: agentPKP.publicKey,
-          ethAddress: agentPKP.ethAddress
-        },
+        agentPKP
       });
       
       setShowSuccess(true);
@@ -147,44 +136,6 @@ export default function ConsentForm({
     setTimeout(onDisapprove, 2000);
   }, [onDisapprove]);
 
-  const handleParameterChange = (parameterType: string, index: number, value: string) => {
-    if (!formData) return;
-    const newParams = { ...formData.parameters };
-    if (!newParams[parameterType]) {
-      newParams[parameterType] = [];
-    }
-    newParams[parameterType][index] = value;
-    setFormData({
-      ...formData,
-      parameters: newParams
-    });
-  };
-
-  const handleAddParameter = (parameterType: string, value: string) => {
-    if (!formData || !value.trim()) return;
-    const newParams = { ...formData.parameters };
-    if (!newParams[parameterType]) {
-      newParams[parameterType] = [];
-    }
-    newParams[parameterType] = [...newParams[parameterType], value.trim()];
-    setFormData({
-      ...formData,
-      parameters: newParams
-    });
-  };
-
-  const handleRemoveParameter = (parameterType: string, index: number) => {
-    if (!formData) return;
-    const newParams = { ...formData.parameters };
-    if (newParams[parameterType]) {
-      newParams[parameterType] = newParams[parameterType].filter((_, i) => i !== index);
-    }
-    setFormData({
-      ...formData,
-      parameters: newParams
-    });
-  };
-
   // Show error message if there's no appId or if there's an error
   if (!appId || appIdError) {
     return (
@@ -196,7 +147,7 @@ export default function ConsentForm({
     );
   }
 
-  if (dbLoading && !appInfo) {
+  if (dbLoading || isLoading) {
     return (
       <div className="consent-form-container">
         <div className="loader">Loading app information...</div>
@@ -251,140 +202,26 @@ export default function ConsentForm({
         </div>
       )}
 
+      <div className="app-info">
+        <h2>{appInfo.data.name}</h2>
+        <p className="description">{appInfo.data.description}</p>
+        <p className="contact">Contact: {appInfo.data.contactEmail}</p>
+      </div>
+
       <form onSubmit={handleSubmit}>
-        {appInfo.appLogo && (
-          <div className="app-logo">
-            <img src={appInfo.appLogo} alt={`${appInfo.metadata.name} logo`} />
-          </div>
-        )}
-
-        <div className="app-info">
-          <div className="app-title">
-            <h2>{appInfo.metadata.name}</h2>
-            {appInfo.verified && (
-              <div className="verified-icon" title="Verified App">
-                <svg viewBox="0 0 24 24" width="20" height="20">
-                  <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
-                </svg>
-              </div>
-            )}
-          </div>
-          {appInfo.verified && (
-            <div className="verified-text">Verified</div>
-          )}
-          <p className="app-description">{appInfo.metadata.description}</p>
-          <div className="address-info">
-            <p className="address-item">
-              <span className="address-label">My address:</span>
-              <span className="address-value">{userAddress.toLowerCase()}</span>
-            </p>
-          </div>
-        </div>
-
-        <div className="permissions-section">
-          <h3>This app would like to:</h3>
-          <ul className="permissions-list">
-            {appInfo.toolDescriptions.map((tool, index) => (
-              <li key={`tool-${index}`}>{tool}</li>
-            ))}
-          </ul>
-        </div>
-
-        <div className="policies-section">
-          <h3>Subject to these policies:</h3>
-          <ul className="policies-list">
-            {appInfo.policies.map((policy, index) => (
-              <li key={`policy-${index}`}>{policy.description}</li>
-            ))}
-          </ul>
-        </div>
-
-        {/* Render parameter sections dynamically based on app configuration */}
-        {appInfo.parameters && Object.entries(appInfo.parameters).map(([paramType, paramConfig]: [string, ParameterConfig]) => (
-          <div key={paramType} className="parameters-section">
-            <h3>{paramConfig.title}</h3>
-            <p className="parameter-description">{paramConfig.description}</p>
-            
-            <div className="parameter-list">
-              {formData?.parameters[paramType]?.map((param, index) => (
-                <div key={`${paramType}-${index}`} className="parameter-item">
-                  <input
-                    type={paramConfig.type === 'number' ? 'number' : 'text'}
-                    value={param}
-                    onChange={(e) => handleParameterChange(paramType, index, e.target.value)}
-                    className="parameter-input"
-                    placeholder={`Enter ${paramConfig.itemLabel || 'value'}`}
-                    min={paramConfig.validation?.min}
-                    max={paramConfig.validation?.max}
-                    pattern={paramConfig.validation?.pattern}
-                  />
-                  {/* Only show remove button for multiple values or non-first items */}
-                  {paramConfig.isMultiple && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveParameter(paramType, index)}
-                      className="btn btn--icon btn--error"
-                      aria-label={`Remove ${paramConfig.itemLabel || 'parameter'}`}
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-
-            {/* Only show add section for multiple values */}
-            {paramConfig.isMultiple && (
-              <div className="parameter-add">
-                <input
-                  type={paramConfig.type === 'number' ? 'number' : 'text'}
-                  value={editingParameter[paramType] || ''}
-                  onChange={(e) => setEditingParameter({
-                    ...editingParameter,
-                    [paramType]: e.target.value
-                  })}
-                  className="parameter-input"
-                  placeholder={`Add new ${paramConfig.itemLabel || 'value'}`}
-                  min={paramConfig.validation?.min}
-                  max={paramConfig.validation?.max}
-                  pattern={paramConfig.validation?.pattern}
-                />
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleAddParameter(paramType, editingParameter[paramType] || '');
-                    setEditingParameter({
-                      ...editingParameter,
-                      [paramType]: ''
-                    });
-                  }}
-                  className="btn btn--primary"
-                  disabled={!editingParameter[paramType]?.trim()}
-                >
-                  Add {paramConfig.itemLabel || 'Value'}
-                </button>
-              </div>
-            )}
-          </div>
-        ))}
-
-        <div className="support-info">
-          <p>Need help? Contact: <a href={`mailto:${appInfo.supportEmail}`}>{appInfo.supportEmail}</a></p>
-        </div>
-
         <div className="form-actions">
-          <button
-            type="submit"
-            className={`btn btn--primary ${submitting ? 'btn--loading' : ''}`}
-            disabled={submitting || showSuccess || showDisapproval}
+          <button 
+            type="submit" 
+            className="button button--primary" 
+            disabled={submitting}
           >
             {submitting ? 'Approving...' : 'Approve'}
           </button>
-          <button
-            type="button"
-            className="btn btn--secondary"
+          <button 
+            type="button" 
+            className="button button--secondary" 
             onClick={handleDisapprove}
-            disabled={submitting || showSuccess || showDisapproval}
+            disabled={submitting}
           >
             Disapprove
           </button>

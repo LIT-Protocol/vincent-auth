@@ -16,12 +16,6 @@ function getContractFromJsSdk(
 ) {
   let contractsDataRes;
   switch (network) {
-    case "manzano":
-      contractsDataRes = manzano;
-      break;
-    case "habanero":
-      contractsDataRes = habanero;
-      break;
     case "datil-dev":
       contractsDataRes = datilDev;
       break;
