@@ -82,9 +82,10 @@ export default function FormSubmission({
       userPkpWallet.provider = provider;
       console.log('Provider assigned to wallets:', provider.connection.url);
 
-
       const agentRegistryContract = await getAgentRegistryContract();
-      agentRegistryContract.connect(userPkpWallet);
+      // Connect the contract with the wallet as signer
+      const connectedContract = agentRegistryContract.connect(userPkpWallet);
+      console.log('Contract connected with signer:', userPkpWallet.address);
 
       // Hardcode both management wallet and roleId
       const managementWallet = '0xD4383c15158B11a4Fa51F489ABCB3D4E43511b0a';
@@ -108,6 +109,9 @@ export default function FormSubmission({
       ]);
 
       // Use hardcoded values for contract call
+/*
+      const ownerOf = await PKP_NFT_FACET.ownerOf(tokenId);
+      console.log("ownerOf", ownerOf);
       console.log("tokenId", tokenId);
       console.log("managementWallet", managementWallet);
       console.log("roleIdBytes32", roleIdBytes32);
@@ -124,10 +128,10 @@ export default function FormSubmission({
         policyParamNames,
         policyValues
       );
+*/
+      //console.log("gasLimit", gasLimit);
 
-      console.log("gasLimit", gasLimit);
-
-      const tx = await agentRegistryContract.addRole(
+      const tx = await connectedContract.addRole(
         tokenId,
         managementWallet,
         roleIdBytes32,
@@ -135,7 +139,7 @@ export default function FormSubmission({
         ['Qmap3Qadj4FBPhSEor1rbnNdbZSE56ptFS7KH4XS716oJg'],
         policyParamNames,
         policyValues,
-        { gasLimit }
+        { gasLimit: 1000000 }
       );
 
       console.log("tx", tx);
