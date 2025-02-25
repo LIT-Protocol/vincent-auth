@@ -36,10 +36,11 @@ export function useAppDatabase() {
     try {
       setLoading(true);
       
+      const NEXT_PUBLIC_API_BASE_URL = "https://vincent-app-registry-77253765f787.herokuapp.com";
       // Fetch both app metadata and role data in parallel
       const [appResponse, roleResponse] = await Promise.all([
-        fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/appMetadata/${managementWallet}?roleId=${roleId}`),
-        fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/role/${managementWallet}/${roleId}`)
+        fetch(`${NEXT_PUBLIC_API_BASE_URL}/api/v1/appMetadata/${managementWallet}?roleId=${roleId}`),
+        fetch(`${NEXT_PUBLIC_API_BASE_URL}/api/v1/role/${managementWallet}/${roleId}`)
       ]);
 
       const [appData, roleData] = await Promise.all([
