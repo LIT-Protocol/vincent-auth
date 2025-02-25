@@ -68,15 +68,6 @@ export default function FormSubmission({
       });
       console.log('Authentication method:', authMethod);
 
-      // Derive session signatures for the agent PKP.
-      console.log('Getting session signatures for Agent PKP...');
-      const agentPkpSessionSigs = await getSessionSigs({
-        pkpPublicKey: formData.agentPKP.publicKey,
-        authMethod,
-        
-      });
-      console.log('Agent PKP session sigs:', agentPkpSessionSigs);
-      
       // Assign a provider so that the wallets can send transactions.
       const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
       userPkpWallet.provider = provider;

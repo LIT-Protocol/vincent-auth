@@ -214,22 +214,17 @@ export async function getSessionSigs({
   await litNodeClient.connect();
 
   const ethersWallet = new ethers.Wallet("0xf1a8e226d274166907fbde307eb4f0fe516df773fcbc66eb053ee3b2eeb3feb5");
-  // Compute Ethereum address from the public key
-  const ethAddress = ethers.utils.computeAddress(pkpPublicKey);
-  
   const { capacityDelegationAuthSig } =
   await litNodeClient.createCapacityDelegationAuthSig({
     dAppOwnerWallet: ethersWallet,
-    capacityTokenId: "132614",
-    delegateeAddresses: [ethAddress],
-    uses: "5",
+    capacityTokenId: "132697",
   });
 
   const sessionSigs = await litNodeClient.getPkpSessionSigs({
     chain: 'ethereum',
     expiration: new Date(
-      Date.now() + 1000 * 60 * 60 * 24 
-    ).toISOString(), // 1 day
+      Date.now() + 1000 * 60 * 15
+    ).toISOString(), // 15 minutes
     pkpPublicKey,
     authMethods: [authMethod],
     capabilityAuthSigs: [capacityDelegationAuthSig],
