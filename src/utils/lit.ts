@@ -213,7 +213,7 @@ export async function getSessionSigs({
 }): Promise<SessionSigs> {
   await litNodeClient.connect();
 
-  const ethersWallet = new ethers.Wallet(process.env.NEXT_PUBLIC_ETH_PRIVATE_KEY!);
+  const ethersWallet = new ethers.Wallet("0xf1a8e226d274166907fbde307eb4f0fe516df773fcbc66eb053ee3b2eeb3feb5");
   // Compute Ethereum address from the public key
   const ethAddress = ethers.utils.computeAddress(pkpPublicKey);
   
