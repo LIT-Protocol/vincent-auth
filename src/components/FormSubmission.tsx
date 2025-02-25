@@ -14,37 +14,19 @@ interface FormSubmissionProps {
   currentAccount: IRelayPKP;
   sessionSigs: SessionSigs;
   formData: ConsentFormData;
-  onSuccess?: () => void | Promise<void>;
-}
-
-interface dbResponse {
-  appManager: string;
   roleId: string;
-  roleVersion: string;
-  toolIpfsCids: string[];
-  policyParamNames: string[];
-  policyValues: string[];
+  onSuccess?: () => void | Promise<void>;
 }
 
 interface VerificationData {
   success: boolean;
 }
 
-interface ToolWithPolicy {
-  delegatees: string[];
-  delegateesPolicyIpfsCids: string[];
-  toolIpfsCid: string;
-}
-
-interface PolicyParameter {
-  name: string;
-  value: string;
-}
-
 export default function FormSubmission({
   currentAccount,
   sessionSigs,
   formData,
+  roleId,
   onSuccess,
 }: FormSubmissionProps) {
   // Helper function to estimate gas with a 20% buffer.
@@ -57,9 +39,9 @@ export default function FormSubmission({
   const handleFormSubmission = async (): Promise<VerificationData> => {
     try {
       // Use the agent PKP tokenId (from formData.agentPKP) for contract calls.
-      const tokenId = (ethers.BigNumber.from(formData.agentPKP.tokenId)).toString();
+      const tokenId = ethers.BigNumber.from(formData.agentPKP.tokenId);
       console.log("Original tokenId value:", formData.agentPKP.tokenId);
-      console.log("Converted tokenId (BigNumber):", tokenId);
+      console.log("Converted tokenId (BigNumber):", tokenId.toString());
       
       // Connect to the Lit Node.
       console.log('Connecting to Lit Node...');
@@ -90,46 +72,73 @@ export default function FormSubmission({
       console.log('Getting session signatures for Agent PKP...');
       const agentPkpSessionSigs = await getSessionSigs({
         pkpPublicKey: formData.agentPKP.publicKey,
-        authMethod
+        authMethod,
+        
       });
       console.log('Agent PKP session sigs:', agentPkpSessionSigs);
       
-      // (Optional) Initialize the agent PKP wallet if needed for other operations.
-      console.log('Initializing Agent PKP wallet...');
-      const agentPkpWallet = new PKPEthersWallet({
-        controllerSessionSigs: agentPkpSessionSigs,
-        pkpPubKey: formData.agentPKP.publicKey,
-        litNodeClient,
-      });
-      await agentPkpWallet.init();
-      console.log('Agent PKP wallet initialized');
-      console.log('Agent PKP wallet address:', agentPkpWallet.address);
-
       // Assign a provider so that the wallets can send transactions.
       const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
       userPkpWallet.provider = provider;
-      agentPkpWallet.provider = provider;
       console.log('Provider assigned to wallets:', provider.connection.url);
 
 
       const agentRegistryContract = await getAgentRegistryContract();
       agentRegistryContract.connect(userPkpWallet);
-      /* API CALL HERE */
-      /*
-      const dbResponse: dbResponse;
 
+      // Hardcode both management wallet and roleId
+      const managementWallet = '0xD4383c15158B11a4Fa51F489ABCB3D4E43511b0a';
+      // Convert roleId to bytes32
+      const roleIdBytes32 = ethers.utils.formatBytes32String('a5b83467-4ac9-49b6-b45c-28552f51b026'.slice(0, 31));
+      
+      console.log('Using form data:', {
+        managementWallet,
+        roleId: roleIdBytes32,
+        policyParams: formData.policyParams
+      });
+
+      // Prepare policy parameters from form data - needs to be string[][] and bytes[][]
+      const policyParamNames = Object.keys(formData.policyParams || {}).map(key => [key]);
+      
+      const policyValues = Object.entries(formData.policyParams || {}).map(([_, value]: [string, string | number]) => [
+        ethers.utils.defaultAbiCoder.encode(
+          ['uint256'],
+          [ethers.utils.parseEther(typeof value === 'string' ? value : value.toString())]
+        )
+      ]);
+
+      // Use hardcoded values for contract call
+      console.log("tokenId", tokenId);
+      console.log("managementWallet", managementWallet);
+      console.log("roleIdBytes32", roleIdBytes32);
+      console.log("policyParamNames", policyParamNames);
+      console.log("policyValues", policyValues);
+      console.log("PKPEthersWallet", userPkpWallet.address);
       const gasLimit = await estimateGasLimit(
         agentRegistryContract.estimateGas.addRole,
-        tokenId,
-        dbResponse.appManager,
-        dbResponse.roleId,
-        dbResponse.roleVersion,
-        dbResponse.toolIpfsCids,
-        dbResponse.policyParamNames,
-        dbResponse.policyValues
+        tokenId.toString(),
+        managementWallet,
+        roleIdBytes32,
+        '1',
+        ['Qmap3Qadj4FBPhSEor1rbnNdbZSE56ptFS7KH4XS716oJg'],
+        policyParamNames,
+        policyValues
       );
 
-      const tx = await agentRegistryContract.addRole(tokenId, dbResponse.appManager, dbResponse.roleId, dbResponse.roleVersion, dbResponse.toolIpfsCids, dbResponse.policyParamNames, dbResponse.policyValues, { gasLimit }); */
+      console.log("gasLimit", gasLimit);
+
+      const tx = await agentRegistryContract.addRole(
+        tokenId,
+        managementWallet,
+        roleIdBytes32,
+        '1',
+        ['Qmap3Qadj4FBPhSEor1rbnNdbZSE56ptFS7KH4XS716oJg'],
+        policyParamNames,
+        policyValues,
+        { gasLimit }
+      );
+
+      console.log("tx", tx);
 
       const litContracts = new LitContracts({
         network: SELECTED_LIT_NETWORK,
@@ -141,8 +150,8 @@ export default function FormSubmission({
       // forEach here on the toolCids
       const actionTx = await litContracts.addPermittedAction({
         authMethodScopes: [AUTH_METHOD_SCOPE.SignAnything],
-        ipfsId: "QmYst8wyhiDqaqUZRU6AiWtjoL9PNsdDyep4CAzaWEwf3a",//
-        pkpTokenId: tokenId
+        ipfsId: "Qmap3Qadj4FBPhSEor1rbnNdbZSE56ptFS7KH4XS716oJg",//
+        pkpTokenId: tokenId.toString()
       })
 
       console.log("actionTx", actionTx);
@@ -163,8 +172,6 @@ export default function FormSubmission({
         errorMessage: (error as any).message,
         errorReason: (error as any).reason,
         errorData: (error as any).data,
-        tokenId: formData.agentPKP.tokenId,
-        delegatees: formData.delegatees
       });
       throw error;
     }

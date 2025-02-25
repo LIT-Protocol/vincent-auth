@@ -47,6 +47,7 @@ export default function Dashboard({
       currentAccount,
       sessionSigs,
       formData,
+      roleId: formData.roleId!,
       onSuccess: () => {
         // Show success animation
         setShowSuccess(true);

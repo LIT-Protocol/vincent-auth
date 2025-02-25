@@ -10,8 +10,8 @@ const AuthMethods = ({
       <div className="buttons-container">
         <button
           type="button"
-          className="btn btn--outline"
-          onClick={() => setView('email')}
+          className="btn btn--outline btn--disabled"
+          disabled
         >
           <div className="btn__icon">
             <svg
@@ -32,8 +32,8 @@ const AuthMethods = ({
         </button>
         <button
           type="button"
-          className="btn btn--outline"
-          onClick={() => setView('phone')}
+          className="btn btn--outline btn--disabled"
+          disabled
         >
           <div className="btn__icon">
             <svg
@@ -54,8 +54,8 @@ const AuthMethods = ({
         </button>
         <button
           type="button"
-          className="btn btn--outline"
-          onClick={() => setView('wallet')}
+          className="btn btn--outline btn--disabled"
+          disabled
         >
           <div className="btn__icon">
             <svg

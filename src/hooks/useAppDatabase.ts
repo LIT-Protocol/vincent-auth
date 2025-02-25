@@ -11,8 +11,20 @@ interface AppData {
   __v: number;
 }
 
+interface RoleData {
+  roleName: string;
+  roleDescription: string;
+  roleId: string;
+  toolPolicy: any[];
+}
+
 export interface AppInfo {
   data: AppData;
+  success: boolean;
+}
+
+export interface RoleInfo {
+  data: RoleData;
   success: boolean;
 }
 
@@ -20,23 +32,33 @@ export function useAppDatabase() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error>();
 
-  const getApplicationByAppId = async (appId: string): Promise<AppInfo | undefined> => {
+  const getApplicationByManagementWallet = async (managementWallet: string, roleId: string): Promise<[AppInfo | undefined, RoleInfo | undefined]> => {
     try {
       setLoading(true);
-      const getAppResponse = await fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/appMetadata/${appId}`);
-      const data = await getAppResponse.json();
-      return data;
+      
+      // Fetch both app metadata and role data in parallel
+      const [appResponse, roleResponse] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/appMetadata/${managementWallet}?roleId=${roleId}`),
+        fetch(`${process.env.NEXT_PUBLIC_API_BASE_URL}/api/v1/role/${managementWallet}/${roleId}`)
+      ]);
+
+      const [appData, roleData] = await Promise.all([
+        appResponse.json(),
+        roleResponse.json()
+      ]);
+
+      return [appData, roleData];
     } catch (err) {
-      console.error('Error fetching app:', err);
+      console.error('Error fetching data:', err);
       setError(err as Error);
-      return undefined;
+      return [undefined, undefined];
     } finally {
       setLoading(false);
     }
   };
 
   return {
-    getApplicationByAppId,
+    getApplicationByManagementWallet,
     loading,
     error
   };

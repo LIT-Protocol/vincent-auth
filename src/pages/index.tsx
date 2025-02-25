@@ -11,7 +11,7 @@ import LoginMethods from '../components/LoginMethods';
 
 export default function IndexView() {
   const router = useRouter();
-  const { appId } = router.query;
+  const { managementWallet, roleId } = router.query;
 
   const {
     authMethod,
@@ -46,14 +46,30 @@ export default function IndexView() {
   }
 
   useEffect(() => {
+    // Always preserve managementWallet and roleId in the URL
+    if (managementWallet && roleId) {
+      // Clean the managementWallet value
+      const cleanManagementWallet = managementWallet.toString().split('?')[0];
+      router.replace(
+        { 
+          pathname: window.location.pathname, 
+          query: { 
+            managementWallet: cleanManagementWallet, 
+            roleId 
+          } 
+        }, 
+        undefined, 
+        { shallow: true }
+      );
+    }
+  }, [managementWallet, roleId, router]);
+
+  useEffect(() => {
     // If user is authenticated, fetch accounts
     if (authMethod) {
-      // Preserve appId in the URL when replacing the pathname
-      const query = appId ? { appId } : undefined;
-      router.replace({ pathname: window.location.pathname, query }, undefined, { shallow: true });
       fetchAccounts(authMethod);
     }
-  }, [authMethod, fetchAccounts, appId]);
+  }, [authMethod, fetchAccounts]);
 
   useEffect(() => {
     // If user is authenticated and has accounts, select the first one

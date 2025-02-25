@@ -5,8 +5,6 @@ import {
   datil,
   datilDev,
   datilTest,
-  habanero,
-  manzano,
 } from "@lit-protocol/contracts";
 
 function getContractFromJsSdk(

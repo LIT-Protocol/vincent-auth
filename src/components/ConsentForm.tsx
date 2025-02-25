@@ -1,13 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/router';
-import { useUrlAppId } from '../hooks/useUrlAppId';
+import { useUrlParams } from '../hooks/useUrlAppId';
 import { useAppDatabase } from '../hooks/useAppDatabase';
 import { ethers } from 'ethers';
 import { getPkpNftContract } from '../utils/get-pkp-nft-contract';
 import { SELECTED_LIT_NETWORK } from '../utils/lit';
 import { LIT_RPC } from '@lit-protocol/constants';
 import { IRelayPKP } from '@lit-protocol/types';
-import type { AppInfo } from '../hooks/useAppDatabase';
+import type { AppInfo, RoleInfo } from '../hooks/useAppDatabase';
+
+interface PolicyVarSchema {
+  defaultValue: any;
+  paramName: string;
+  valueType: string;
+}
+
+interface ToolPolicy {
+  description?: string;
+  policyVarsSchema: PolicyVarSchema[];
+  toolIpfsCid: string;
+}
 
 export interface ConsentFormData {
   delegatees: string[];
@@ -16,6 +28,10 @@ export interface ConsentFormData {
     publicKey: string;
     ethAddress: string;
   };
+  policyParams?: {
+    [key: string]: string;
+  };
+  roleId?: string;
 }
 
 interface ConsentFormProps {
@@ -29,10 +45,12 @@ export default function ConsentForm({
   onDisapprove, 
   userAddress,
 }: ConsentFormProps) {
-  const { appId, error: appIdError } = useUrlAppId();
-  const { getApplicationByAppId, loading: dbLoading, error: dbError } = useAppDatabase();
+  const { managementWallet, roleId, error: urlError } = useUrlParams();
+  const { getApplicationByManagementWallet, loading: dbLoading, error: dbError } = useAppDatabase();
   const [formData, setFormData] = useState<ConsentFormData | null>(null);
+  const [policyInputs, setPolicyInputs] = useState<{[key: string]: string}>({});
   const [appInfo, setAppInfo] = useState<AppInfo | null>(null);
+  const [roleInfo, setRoleInfo] = useState<RoleInfo | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const [showDisapproval, setShowDisapproval] = useState<boolean>(false);
@@ -44,22 +62,36 @@ export default function ConsentForm({
     let mounted = true;
 
     async function fetchAppInfo() {
-      if (!appId || !mounted) return;
+      if (!managementWallet || !roleId || !mounted) return;
 
       try {
         setIsLoading(true);
-        const app = await getApplicationByAppId(appId);
+        const [app, role] = await getApplicationByManagementWallet(managementWallet, roleId);
         
-        if (mounted && app && app.success) {
+        if (mounted && app?.success && role?.success) {
           setAppInfo(app);
+          setRoleInfo(role);
+          
+          // Initialize form data with default policy parameters
+          const defaultPolicyParams: { [key: string]: string } = {};
+          role.data.toolPolicy?.forEach(policy => {
+            policy.policyVarsSchema?.forEach((variable: PolicyVarSchema) => {
+              defaultPolicyParams[variable.paramName] = variable.defaultValue?.toString() || '0';
+            });
+          });
+          
           setFormData({
             delegatees: [app.data.managementWallet],
             agentPKP: {
               tokenId: '',
               publicKey: '',
               ethAddress: ''
-            }
+            },
+            policyParams: defaultPolicyParams
           });
+          
+          // Also set the policy inputs state
+          setPolicyInputs(defaultPolicyParams);
         }
       } catch (err) {
         if (mounted) {
@@ -77,7 +109,14 @@ export default function ConsentForm({
     return () => {
       mounted = false;
     };
-  }, [appId]);
+  }, [managementWallet, roleId]);
+
+  const handlePolicyInputChange = (paramName: string, value: string) => {
+    setPolicyInputs(prev => ({
+      ...prev,
+      [paramName]: value
+    }));
+  };
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,12 +137,10 @@ export default function ConsentForm({
         const pubKey = await pkpNftContract.getPubkey(tokenId);
         const ethAddress = await pkpNftContract.getEthAddress(tokenId);
         
-        // Skip if this PKP is the controller (user's address)
         if (ethAddress.toLowerCase() === userAddress.toLowerCase()) {
           continue;
         }
         
-        // We found the agent PKP
         agentPKP = {
           tokenId: tokenId.toString(),
           publicKey: pubKey,
@@ -116,10 +153,12 @@ export default function ConsentForm({
         throw new Error('No agent PKP found for this user');
       }
 
-      // Submit form data with agent PKP
+      // Submit form data with agent PKP and policy parameters
       await onSubmit({
         ...formData,
-        agentPKP
+        agentPKP,
+        policyParams: policyInputs,
+        ...(roleId ? { roleId } : {})
       });
       
       setShowSuccess(true);
@@ -128,7 +167,7 @@ export default function ConsentForm({
     } finally {
       setSubmitting(false);
     }
-  }, [formData, onSubmit, userAddress]);
+  }, [formData, policyInputs, onSubmit, userAddress, roleId]);
 
   const handleDisapprove = useCallback(async () => {
     setShowDisapproval(true);
@@ -136,12 +175,12 @@ export default function ConsentForm({
     setTimeout(onDisapprove, 2000);
   }, [onDisapprove]);
 
-  // Show error message if there's no appId or if there's an error
-  if (!appId || appIdError) {
+  // Show error message if there's no managementWallet or roleId or if there's an error
+  if (!managementWallet || !roleId || urlError) {
     return (
       <div className="consent-form-container">
         <div className="alert alert--error">
-          <p>{appIdError || 'No AppId provided'}</p>
+          <p>{urlError || 'Missing required parameters'}</p>
         </div>
       </div>
     );
@@ -165,7 +204,7 @@ export default function ConsentForm({
     );
   }
 
-  if (!formData || !appInfo) {
+  if (!formData || !appInfo || !roleInfo) {
     return (
       <div className="consent-form-container">
         <div className="alert alert--error">
@@ -202,24 +241,77 @@ export default function ConsentForm({
         </div>
       )}
 
-      <div className="app-info">
-        <h2>{appInfo.data.name}</h2>
-        <p className="description">{appInfo.data.description}</p>
-        <p className="contact">Contact: {appInfo.data.contactEmail}</p>
+      <div className="card app-info">
+        <div className="card-header">
+          <h2 className="card-title">{appInfo.data.name}</h2>
+        </div>
+        <div className="card-body">
+          <p className="app-description">{appInfo.data.description}</p>
+          <p className="contact-info">
+            <span className="label">Contact: </span>
+            <a href={`mailto:${appInfo.data.contactEmail}`} className="contact-link">
+              {appInfo.data.contactEmail}
+            </a>
+          </p>
+        </div>
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <div className="card role-info">
+        <div className="card-header">
+          <h3 className="card-title">{roleInfo.data.roleName}</h3>
+        </div>
+        <div className="card-body">
+          <div className="role-section">
+            <h4 className="section-title">Description</h4>
+            <p className="role-description">{roleInfo.data.roleDescription}</p>
+          </div>
+          
+          {roleInfo.data.toolPolicy && roleInfo.data.toolPolicy.length > 0 && (
+            <div className="policy-section">
+              <h3 className="section-title">Capabilities & Restrictions</h3>
+              {roleInfo.data.toolPolicy.map((policy, index) => (
+                <div key={index} className="parameters-section">
+                  <h4 className="parameter-title">Maximum Transaction Amount</h4>
+                  {policy.description && (
+                    <p className="parameter-description">{policy.description}</p>
+                  )}
+
+                  {policy.policyVarsSchema && policy.policyVarsSchema.length > 0 && (
+                    <div className="parameter-list">
+                      {policy.policyVarsSchema.map((variable: PolicyVarSchema, varIndex: number) => (
+                        <div key={varIndex} className="parameter-item">
+                          <input
+                            id={`param-${variable.paramName}`}
+                            type="number"
+                            className="parameter-input"
+                            value={policyInputs[variable.paramName] ?? variable.defaultValue ?? '0'}
+                            onChange={(e) => handlePolicyInputChange(variable.paramName, e.target.value)}
+                            min="0"
+                            placeholder={`Enter ${variable.paramName}`}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="consent-form">
         <div className="form-actions">
           <button 
             type="submit" 
-            className="button button--primary" 
+            className="btn btn--primary" 
             disabled={submitting}
           >
             {submitting ? 'Approving...' : 'Approve'}
           </button>
           <button 
             type="button" 
-            className="button button--secondary" 
+            className="btn btn--secondary" 
             onClick={handleDisapprove}
             disabled={submitting}
           >

@@ -23,6 +23,7 @@ import {
 import { LitActionResource, LitPKPResource } from '@lit-protocol/auth-helpers';
 import { ethers } from 'ethers';
 import { getPkpNftContract } from './get-pkp-nft-contract';
+import { LitContracts } from '@lit-protocol/contracts-sdk';
 
 export const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || 'localhost';
 export const ORIGIN =
@@ -30,9 +31,8 @@ export const ORIGIN =
     ? `https://${DOMAIN}`
     : `http://${DOMAIN}:3000`;
 
-export const SELECTED_LIT_NETWORK = ((process.env
-  .NEXT_PUBLIC_LIT_NETWORK as string) ||
-  LIT_NETWORK.DatilDev) as LIT_NETWORKS_KEYS;
+export const SELECTED_LIT_NETWORK = 
+  LIT_NETWORK.Datil as LIT_NETWORKS_KEYS;
 
 export const litNodeClient: LitNodeClient = new LitNodeClient({
   alertWhenUnauthorized: false,
@@ -212,6 +212,19 @@ export async function getSessionSigs({
   authMethod: AuthMethod;
 }): Promise<SessionSigs> {
   await litNodeClient.connect();
+
+  const ethersWallet = new ethers.Wallet(process.env.NEXT_PUBLIC_ETH_PRIVATE_KEY!);
+  // Compute Ethereum address from the public key
+  const ethAddress = ethers.utils.computeAddress(pkpPublicKey);
+  
+  const { capacityDelegationAuthSig } =
+  await litNodeClient.createCapacityDelegationAuthSig({
+    dAppOwnerWallet: ethersWallet,
+    capacityTokenId: "132614",
+    delegateeAddresses: [ethAddress],
+    uses: "5",
+  });
+
   const sessionSigs = await litNodeClient.getPkpSessionSigs({
     chain: 'ethereum',
     expiration: new Date(
@@ -219,6 +232,7 @@ export async function getSessionSigs({
     ).toISOString(), // 1 day
     pkpPublicKey,
     authMethods: [authMethod],
+    capabilityAuthSigs: [capacityDelegationAuthSig],
     resourceAbilityRequests: [
       {
         resource: new LitActionResource('*'),
@@ -343,7 +357,7 @@ export async function mintPKPToExistingPKP(pkp: IRelayPKP): Promise<IRelayPKP> {
     sendToAddressAfterMinting: pkp.ethAddress,
   };
 
-  const agentMintResponse = await fetch('https://datil-dev-relayer.getlit.dev/mint-next-and-add-auth-methods', {
+  const agentMintResponse = await fetch('https://datil-relayer.getlit.dev/mint-next-and-add-auth-methods', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

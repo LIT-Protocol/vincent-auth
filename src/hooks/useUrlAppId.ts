@@ -1,38 +1,56 @@
 import { useState, useEffect } from 'react';
 
-interface UrlAppIdResult {
-  appId: string | null;
+interface UrlParamsResult {
+  managementWallet: string | null;
+  roleId: string | null;
   error: string | null;
 }
 
 // Function to validate Ethereum address
 const isValidEthereumAddress = (address: string): boolean => {
-  return /^0x[a-fA-F0-9]{40}$/.test(address);
+  // Clean the address first
+  const cleanAddress = address.split('?')[0].trim();
+  return /^0x[a-fA-F0-9]{40}$/.test(cleanAddress);
 };
 
-export function useUrlAppId(): UrlAppIdResult {
-  const [appId, setAppId] = useState<string | null>(null);
+export function useUrlParams(): UrlParamsResult {
+  const [managementWallet, setManagementWallet] = useState<string | null>(null);
+  const [roleId, setRoleId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const urlAppId = params.get('appId');
+    // Parse the full URL to handle all query parameters
+    const url = new URL(window.location.href);
+    const params = new URLSearchParams(url.search);
     
-    if (!urlAppId) {
+    const urlManagementWallet = params.get('managementWallet')?.split('?')[0].trim();
+    const urlRoleId = params.get('roleId');
+    
+    if (!urlManagementWallet) {
       setError('No Ethereum address provided');
-      setAppId(null);
+      setManagementWallet(null);
+      setRoleId(null);
       return;
     }
 
-    if (!isValidEthereumAddress(urlAppId)) {
+    if (!isValidEthereumAddress(urlManagementWallet)) {
       setError('Invalid Ethereum address format');
-      setAppId(null);
+      setManagementWallet(null);
+      setRoleId(null);
+      return;
+    }
+
+    if (!urlRoleId) {
+      setError('No roleId provided');
+      setManagementWallet(null);
+      setRoleId(null);
       return;
     }
 
     setError(null);
-    setAppId(urlAppId);
+    setManagementWallet(urlManagementWallet);
+    setRoleId(urlRoleId);
   }, []);
 
-  return { appId, error };
+  return { managementWallet, roleId, error };
 } 
