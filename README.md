@@ -35,6 +35,7 @@ npm run dev
 
 By default, it uses the `datil-dev` network. If you want to change the network, you can modify the environment variable:
 
+
 ```
 NEXT_PUBLIC_LIT_NETWORK=datil-dev
 ```
