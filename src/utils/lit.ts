@@ -243,13 +243,6 @@ export async function getSessionSigs({
   return sessionSigs;
 }
 
-export async function updateSessionSigs(
-  params: GetSessionSigsProps
-): Promise<SessionSigs> {
-  const sessionSigs = await litNodeClient.getSessionSigs(params);
-  return sessionSigs;
-}
-
 /**
  * Fetch PKPs associated with given auth method, minting one if none exist
  */
@@ -264,6 +257,8 @@ export async function getPKPs(authMethod: AuthMethod): Promise<IRelayPKP[]> {
     console.log('No PKPs found, minting new one...');
     const newPKP = await mintPKP(authMethod);
     console.log('Minted new PKP:', newPKP);
+    const newPKP2 = await mintPKPToExistingPKP(newPKP);
+    console.log("second PKP minted", newPKP2);
 
     // Fetch PKPs again to get the complete list
     allPKPs = await provider.fetchPKPsThroughRelayer(authMethod);
