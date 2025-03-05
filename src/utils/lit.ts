@@ -5,6 +5,7 @@ import {
   LitRelay,
   StytchAuthFactorOtpProvider,
 } from '@lit-protocol/lit-auth-client';
+import { disconnectWeb3 } from '@lit-protocol/auth-browser';
 import { LitNodeClient } from '@lit-protocol/lit-node-client';
 import {
   AUTH_METHOD_SCOPE,
@@ -241,6 +242,13 @@ export async function getSessionSigs({
   });
 
   return sessionSigs;
+}
+
+/**
+ * Disconnects web3 session after use
+ */
+export async function cleanupSession(): Promise<void> {
+  await disconnectWeb3();
 }
 
 /**

@@ -4,6 +4,7 @@ import { useDisconnect } from 'wagmi';
 import ConsentForm, { ConsentFormData } from './ConsentForm';
 import FormSubmission from './FormSubmission';
 import { useState } from 'react';
+import { cleanupSession } from '../utils/lit';
 
 interface DashboardProps {
   currentAccount: IRelayPKP;
@@ -37,6 +38,8 @@ export default function Dashboard({
   async function handleLogout() {
     try {
       await disconnectAsync();
+      // Clean up web3 connection
+      await cleanupSession();
     } catch (err) { }
     localStorage.removeItem('lit-wallet-sig');
     handleRedirect(currentAccount.ethAddress);

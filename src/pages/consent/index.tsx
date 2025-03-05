@@ -1,17 +1,20 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import useAuthenticate from '../../hooks/useAuthenticate';
-import useSession from '../../hooks/useSession';
 import useAccounts from '../../hooks/useAccounts';
-import { ORIGIN, registerWebAuthn } from '../../utils/lit';
+import { ORIGIN, registerWebAuthn, getSessionSigs, cleanupSession } from '../../utils/lit';
 import { AUTH_METHOD_TYPE } from '@lit-protocol/constants';
 import Dashboard from '../../components/Dashboard';
 import Loading from '../../components/Loading';
 import LoginMethods from '../../components/LoginMethods';
+import { SessionSigs } from '@lit-protocol/types';
 
 export default function ConsentPage() {
   const router = useRouter();
   const { managementWallet, roleId } = router.query;
+  const [sessionSigs, setSessionSigs] = useState<SessionSigs>();
+  const [sessionLoading, setSessionLoading] = useState<boolean>(false);
+  const [sessionError, setSessionError] = useState<Error>();
 
   const {
     authMethod,
@@ -29,14 +32,27 @@ export default function ConsentPage() {
     loading: accountsLoading,
     error: accountsError,
   } = useAccounts();
-  const {
-    initSession,
-    sessionSigs,
-    loading: sessionLoading,
-    error: sessionError,
-  } = useSession();
 
   const error = authError || accountsError || sessionError;
+
+  // Function to generate session signatures on-demand
+  async function generateSessionSigs() {
+    if (!authMethod || !currentAccount) return;
+    
+    setSessionLoading(true);
+    setSessionError(undefined);
+    try {
+      const sigs = await getSessionSigs({
+        pkpPublicKey: currentAccount.publicKey,
+        authMethod
+      });
+      setSessionSigs(sigs);
+    } catch (err) {
+      setSessionError(err as Error);
+    } finally {
+      setSessionLoading(false);
+    }
+  }
 
   async function handleRegisterWithWebAuthn() {
     const newPKP = await registerWebAuthn();
@@ -79,11 +95,21 @@ export default function ConsentPage() {
   }, [authMethod, accounts, currentAccount, setCurrentAccount]);
 
   useEffect(() => {
-    // If user is authenticated and has selected an account, initialize session
+    // If user is authenticated and has selected an account, generate session sigs
     if (authMethod && currentAccount) {
-      initSession(authMethod, currentAccount);
+      generateSessionSigs();
     }
-  }, [authMethod, currentAccount, initSession]);
+  }, [authMethod, currentAccount]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      // Cleanup web3 connection when component unmounts
+      if (sessionSigs) {
+        cleanupSession();
+      }
+    };
+  }, [sessionSigs]);
 
   // Loading states
   if (authLoading) {
@@ -98,7 +124,12 @@ export default function ConsentPage() {
 
   // Authenticated states
   if (currentAccount && sessionSigs) {
-    return <Dashboard currentAccount={currentAccount} sessionSigs={sessionSigs} />;
+    return (
+      <Dashboard 
+        currentAccount={currentAccount} 
+        sessionSigs={sessionSigs} 
+      />
+    );
   }
 
   // No accounts found state

@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@lit-protocol/auth-browser": "^7.0.7",
     "@lit-protocol/auth-helpers": "^7.0.0",
     "@lit-protocol/constants": "^7.0.0",
     "@lit-protocol/contracts-sdk": "^7.0.6",

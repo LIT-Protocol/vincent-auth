@@ -1,6 +1,6 @@
 import { IRelayPKP, SessionSigs } from '@lit-protocol/types';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
-import { litNodeClient, mintPKPToExistingPKP, getSessionSigs, SELECTED_LIT_NETWORK } from '../utils/lit';
+import { litNodeClient, mintPKPToExistingPKP, getSessionSigs, SELECTED_LIT_NETWORK, cleanupSession } from '../utils/lit';
 import { LitContracts } from '@lit-protocol/contracts-sdk';
 import type { ConsentFormData } from './ConsentForm';
 import { ethers } from 'ethers';
@@ -156,6 +156,9 @@ export default function FormSubmission({
         await onSuccess();
       }
 
+      // Cleanup web3 connection after successful transaction
+      await cleanupSession();
+
       return {
         success: true,
       };
@@ -168,6 +171,14 @@ export default function FormSubmission({
         errorReason: (error as any).reason,
         errorData: (error as any).data,
       });
+      
+      // Cleanup web3 connection even on error
+      try {
+        await cleanupSession();
+      } catch (cleanupError) {
+        console.error('Error during cleanup:', cleanupError);
+      }
+      
       throw error;
     }
   };
