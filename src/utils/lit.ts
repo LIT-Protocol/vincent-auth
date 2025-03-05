@@ -103,7 +103,7 @@ function getStytchEmailOtpProvider() {
         relay: litRelay,
         litNodeClient,
       },
-      { appId: process.env.NEXT_PUBLIC_STYTCH_PROJECT_ID! },
+      { appId: "project-test-6391e066-3ed1-447c-bb56-982e7e38e19a" },
       'email',
     );
   }
@@ -117,7 +117,7 @@ function getStytchSmsOtpProvider() {
         relay: litRelay,
         litNodeClient,
       },
-      { appId: process.env.NEXT_PUBLIC_STYTCH_PROJECT_ID! },
+      { appId: "project-test-6391e066-3ed1-447c-bb56-982e7e38e19a" },
       'sms',
     );
   }
