@@ -54,6 +54,21 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
       const response = await stytchClient.otps.authenticate(code, methodId, {
         session_duration_minutes: 60,
       });
+      
+      // Store the email/phone in localStorage
+      try {
+        const authInfo = {
+          type: method,
+          value: userId,
+          userId: response.user_id,
+          authenticatedAt: new Date().toISOString()
+        };
+        console.log(`Storing ${method} information in localStorage:`, authInfo);
+        localStorage.setItem('lit-auth-info', JSON.stringify(authInfo));
+      } catch (storageError) {
+        console.error('Error storing auth info in localStorage:', storageError);
+      }
+      
       await authWithStytch(response.session_jwt, response.user_id, method);
     } catch (err) {
       setError(err as Error);

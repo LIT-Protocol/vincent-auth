@@ -9,11 +9,15 @@ import { cleanupSession } from '../utils/lit';
 interface DashboardProps {
   currentAccount: IRelayPKP;
   sessionSigs: SessionSigs;
+  agentPKP?: IRelayPKP;
+  agentSessionSigs?: SessionSigs;
 }
 
 export default function Dashboard({
   currentAccount,
   sessionSigs,
+  agentPKP,
+  agentSessionSigs
 }: DashboardProps) {
   const { disconnectAsync } = useDisconnect();
   const router = useRouter();

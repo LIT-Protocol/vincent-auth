@@ -8,6 +8,7 @@ import { MetaMaskConnector } from 'wagmi/connectors/metaMask';
 import { StytchProvider } from '@stytch/nextjs';
 import { createStytchUIClient } from '@stytch/nextjs/ui';
 import { Albert_Sans } from 'next/font/google';
+import SessionValidator from '../components/SessionValidator';
 
 const { provider, chains } = configureChains(
   [mainnet, goerli, optimism],
@@ -44,6 +45,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     <StytchProvider stytch={stytch}>
       <WagmiConfig client={client}>
         <main className={font.className}>
+          <SessionValidator />
           <Component {...pageProps} />
         </main>
       </WagmiConfig>

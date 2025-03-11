@@ -75,7 +75,7 @@ function getAuthenticatedProvider(authMethod: AuthMethod): BaseProvider {
   }
 }
 
-function getEthWalletProvider() {
+export function getEthWalletProvider() {
   if (!ethWalletProvider) {
     ethWalletProvider = new EthWalletProvider({
       relay: litRelay,
@@ -87,6 +87,7 @@ function getEthWalletProvider() {
 
   return ethWalletProvider;
 }
+
 function getWebAuthnProvider() {
   if (!webAuthnProvider) {
     webAuthnProvider = new WebAuthnProvider({
@@ -221,6 +222,9 @@ export async function getSessionSigs({
     capacityTokenId: "132697",
   });
 
+  console.log("Attempting to get session sigs")
+  console.log(authMethod)
+  console.log(pkpPublicKey)
   const sessionSigs = await litNodeClient.getPkpSessionSigs({
     chain: 'ethereum',
     expiration: new Date(

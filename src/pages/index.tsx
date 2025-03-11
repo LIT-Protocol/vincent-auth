@@ -2,17 +2,23 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import useAuthenticate from '../hooks/useAuthenticate';
 import useAccounts from '../hooks/useAccounts';
-import { ORIGIN, registerWebAuthn, getSessionSigs, cleanupSession } from '../utils/lit';
+import { ORIGIN, registerWebAuthn, getSessionSigs, cleanupSession, SELECTED_LIT_NETWORK, litNodeClient } from '../utils/lit';
 import { AUTH_METHOD_TYPE } from '@lit-protocol/constants';
 import Dashboard from '../components/Dashboard';
 import Loading from '../components/Loading';
 import LoginMethods from '../components/LoginMethods';
-import { SessionSigs } from '@lit-protocol/types';
+import { SessionSigs, IRelayPKP } from '@lit-protocol/types';
+import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
+import { EthWalletProvider } from '@lit-protocol/lit-auth-client';
+import { getAgentPKP } from '../utils/getAgentPKP';
+import { validateStoredSessionSig } from '../components/SessionValidator';
 
 export default function IndexView() {
   const router = useRouter();
   const { managementWallet, roleId } = router.query;
   const [sessionSigs, setSessionSigs] = useState<SessionSigs>();
+  const [agentSessionSigs, setAgentSessionSigs] = useState<SessionSigs>();
+  const [agentPKP, setAgentPKP] = useState<IRelayPKP>();
   const [sessionLoading, setSessionLoading] = useState<boolean>(false);
   const [sessionError, setSessionError] = useState<Error>();
 
@@ -42,11 +48,51 @@ export default function IndexView() {
     setSessionLoading(true);
     setSessionError(undefined);
     try {
+      // Generate session signatures for the user PKP
       const sigs = await getSessionSigs({
         pkpPublicKey: currentAccount.publicKey,
         authMethod
       });
       setSessionSigs(sigs);
+      
+      // After getting user PKP session sigs, try to get the agent PKP
+      try {
+        const agentPkpInfo = await getAgentPKP(currentAccount.ethAddress);
+        setAgentPKP(agentPkpInfo);
+        
+        // Initialize the user PKP wallet
+        console.log('Generating new agent session signatures...');
+        console.log('Initializing user PKP wallet...');
+        const userPkpWallet = new PKPEthersWallet({
+          controllerSessionSigs: sigs,
+          pkpPubKey: currentAccount.publicKey,
+          litNodeClient: litNodeClient,
+        });
+        await userPkpWallet.init();
+        console.log('User PKP wallet initialized');
+        console.log('User PKP details:', currentAccount);
+        console.log('Agent PKP details:', agentPkpInfo);
+
+        // Authenticate with EthWalletProvider
+        console.log('Authenticating with EthWalletProvider...');
+        const authMethodForAgent = await EthWalletProvider.authenticate({
+          signer: userPkpWallet,
+          litNodeClient
+        });
+        console.log('Authentication method:', authMethodForAgent);
+
+        // Derive session signatures for the agent PKP
+        console.log('Getting session signatures for Agent PKP...');
+        const agentPkpSessionSigs = await getSessionSigs({
+          pkpPublicKey: agentPkpInfo.publicKey,
+          authMethod: authMethodForAgent,
+        });
+        console.log('Agent PKP session sigs:', agentPkpSessionSigs);
+        setAgentSessionSigs(agentPkpSessionSigs);
+      } catch (agentError) {
+        console.error('Error handling Agent PKP:', agentError);
+        // Don't set session error - we can still proceed with just the user PKP
+      }
     } catch (err) {
       setSessionError(err as Error);
     } finally {
@@ -127,7 +173,9 @@ export default function IndexView() {
     return (
       <Dashboard 
         currentAccount={currentAccount} 
-        sessionSigs={sessionSigs} 
+        sessionSigs={sessionSigs}
+        agentPKP={agentPKP}
+        agentSessionSigs={agentSessionSigs}
       />
     );
   }

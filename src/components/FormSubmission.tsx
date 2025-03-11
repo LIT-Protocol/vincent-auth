@@ -1,6 +1,6 @@
 import { IRelayPKP, SessionSigs } from '@lit-protocol/types';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
-import { litNodeClient, mintPKPToExistingPKP, getSessionSigs, SELECTED_LIT_NETWORK, cleanupSession } from '../utils/lit';
+import { litNodeClient, mintPKPToExistingPKP, getSessionSigs, SELECTED_LIT_NETWORK } from '../utils/lit';
 import { LitContracts } from '@lit-protocol/contracts-sdk';
 import type { ConsentFormData } from './ConsentForm';
 import { ethers } from 'ethers';
@@ -9,6 +9,7 @@ import { getAppDelegationRegistryContract } from '../utils/get-app-delegation-re
 import { LIT_RPC, AUTH_METHOD_SCOPE } from "@lit-protocol/constants";
 import { EthWalletProvider } from '@lit-protocol/lit-auth-client';
 import { getPkpNftContract } from '../utils/get-pkp-nft-contract';
+import { validateSessionSigs } from '@lit-protocol/misc';
 
 interface FormSubmissionProps {
   currentAccount: IRelayPKP;
@@ -68,6 +69,14 @@ export default function FormSubmission({
       });
       console.log('Authentication method:', authMethod);
 
+      // Derive session signatures for the agent PKP.
+      console.log('Getting session signatures for Agent PKP...');
+      const agentPkpSessionSigs = await getSessionSigs({
+        pkpPublicKey: formData.agentPKP.publicKey,
+        authMethod,
+      });
+      console.log('Agent PKP session sigs:', agentPkpSessionSigs);
+      
       // Assign a provider so that the wallets can send transactions.
       const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
       userPkpWallet.provider = provider;
@@ -156,9 +165,6 @@ export default function FormSubmission({
         await onSuccess();
       }
 
-      // Cleanup web3 connection after successful transaction
-      await cleanupSession();
-
       return {
         success: true,
       };
@@ -171,14 +177,6 @@ export default function FormSubmission({
         errorReason: (error as any).reason,
         errorData: (error as any).data,
       });
-      
-      // Cleanup web3 connection even on error
-      try {
-        await cleanupSession();
-      } catch (cleanupError) {
-        console.error('Error during cleanup:', cleanupError);
-      }
-      
       throw error;
     }
   };

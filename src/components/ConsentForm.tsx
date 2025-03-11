@@ -1,24 +1,13 @@
-import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/router';
+import { useCallback, useEffect, useState } from 'react';
 import { useUrlParams } from '../hooks/useUrlAppId';
 import { useAppDatabase } from '../hooks/useAppDatabase';
-import { ethers } from 'ethers';
-import { getPkpNftContract } from '../utils/get-pkp-nft-contract';
-import { SELECTED_LIT_NETWORK } from '../utils/lit';
-import { LIT_RPC } from '@lit-protocol/constants';
-import { IRelayPKP } from '@lit-protocol/types';
 import type { AppInfo, RoleInfo } from '../hooks/useAppDatabase';
+import { getAgentPKP } from '../utils/getAgentPKP';
 
 interface PolicyVarSchema {
   defaultValue: any;
   paramName: string;
   valueType: string;
-}
-
-interface ToolPolicy {
-  description?: string;
-  policyVarsSchema: PolicyVarSchema[];
-  toolIpfsCid: string;
 }
 
 export interface ConsentFormData {
@@ -126,32 +115,8 @@ export default function ConsentForm({
     setError(null);
 
     try {
-      // Fetch agent PKP at submission time
-      const pkpNftContract = getPkpNftContract(SELECTED_LIT_NETWORK);
-      const balance = await pkpNftContract.balanceOf(userAddress);
-      let agentPKP = null;
-
-      // Fetch each PKP's details
-      for (let i = 0; i < balance.toNumber(); i++) {
-        const tokenId = await pkpNftContract.tokenOfOwnerByIndex(userAddress, i);
-        const pubKey = await pkpNftContract.getPubkey(tokenId);
-        const ethAddress = await pkpNftContract.getEthAddress(tokenId);
-        
-        if (ethAddress.toLowerCase() === userAddress.toLowerCase()) {
-          continue;
-        }
-        
-        agentPKP = {
-          tokenId: tokenId.toString(),
-          publicKey: pubKey,
-          ethAddress: ethAddress
-        };
-        break;
-      }
-
-      if (!agentPKP) {
-        throw new Error('No agent PKP found for this user');
-      }
+      // Fetch agent PKP using the utility function
+      const agentPKP = await getAgentPKP(userAddress);
 
       // Submit form data with agent PKP and policy parameters
       await onSubmit({
