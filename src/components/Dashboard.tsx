@@ -16,37 +16,16 @@ interface DashboardProps {
 export default function Dashboard({
   currentAccount,
   sessionSigs,
-  agentPKP,
-  agentSessionSigs
 }: DashboardProps) {
   const { disconnectAsync } = useDisconnect();
-  const router = useRouter();
   const [showSuccess, setShowSuccess] = useState(false);
 
-  const handleRedirect = (agentPkpAddress: string) => {
-    const returnUrl = router.query.returnUrl as string;
-    // Add pkpEthAddress to the returnUrl if it exists
-    if (returnUrl) {
-      const url = new URL(returnUrl);
-      url.searchParams.append('pkpEthAddress', agentPkpAddress);
-      window.location.href = url.toString();
-    } else {
-      // If no returnUrl, use document.referrer or fallback to '/'
-      const fallbackUrl = document.referrer || '/';
-      const url = new URL(fallbackUrl);
-      url.searchParams.append('pkpEthAddress', agentPkpAddress);
-      window.location.href = url.toString();
-    }
-  };
 
   async function handleLogout() {
     try {
       await disconnectAsync();
-      // Clean up web3 connection
       await cleanupSession();
     } catch (err) { }
-    localStorage.removeItem('lit-wallet-sig');
-    handleRedirect(currentAccount.ethAddress);
   }
 
   const handleFormSubmit = async (formData: ConsentFormData) => {
@@ -62,7 +41,6 @@ export default function Dashboard({
         return new Promise<void>(resolve => {
           // Give time for the checkmark animation to complete
           setTimeout(() => {
-            handleRedirect(formData.agentPKP.ethAddress);
             resolve();
           }, 2000); // Increased time to ensure animation is visible
         });

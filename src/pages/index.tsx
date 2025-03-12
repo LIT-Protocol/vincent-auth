@@ -11,7 +11,6 @@ import { SessionSigs, IRelayPKP } from '@lit-protocol/types';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { EthWalletProvider } from '@lit-protocol/lit-auth-client';
 import { getAgentPKP } from '../utils/getAgentPKP';
-import { validateStoredSessionSig } from '../components/SessionValidator';
 
 export default function IndexView() {
   const router = useRouter();
@@ -88,6 +87,19 @@ export default function IndexView() {
           authMethod: authMethodForAgent,
         });
         console.log('Agent PKP session sigs:', agentPkpSessionSigs);
+
+        const agentPkpWallet = new PKPEthersWallet({
+          controllerSessionSigs: agentPkpSessionSigs,
+          pkpPubKey: agentPkpInfo.publicKey,
+          litNodeClient: litNodeClient,
+        });
+        await agentPkpWallet.init();
+
+        const agentAuthMethod = await EthWalletProvider.authenticate({
+          signer: agentPkpWallet,
+          litNodeClient
+        });
+        console.log('Agent PKP authentication method:', agentAuthMethod);
         setAgentSessionSigs(agentPkpSessionSigs);
       } catch (agentError) {
         console.error('Error handling Agent PKP:', agentError);

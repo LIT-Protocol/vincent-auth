@@ -35,6 +35,23 @@ export default function WebAuthn({
     setLoading(true);
     try {
       await authWithWebAuthn();
+      
+      // Store WebAuthn information in localStorage with a basic entry
+      // since the response is undefined
+      try {
+        const authInfo = {
+          type: 'webauthn',
+          credentialId: 'webauthn-credential', // Default value since we can't get actual ID
+          authenticatedAt: new Date().toISOString(),
+          authMethodType: 3
+        };
+        
+        console.log('Storing basic WebAuthn information in localStorage:', authInfo);
+        localStorage.setItem('lit-auth-info', JSON.stringify(authInfo));
+      } catch (storageError) {
+        console.error('Error storing WebAuthn info in localStorage:', storageError);
+      }
+      
     } catch (err) {
       console.error(err);
       setError(err as Error);
