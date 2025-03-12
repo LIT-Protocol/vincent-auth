@@ -21,6 +21,7 @@ export default function IndexView() {
   const [agentPKP, setAgentPKP] = useState<IRelayPKP>();
   const [sessionLoading, setSessionLoading] = useState<boolean>(false);
   const [sessionError, setSessionError] = useState<Error>();
+  const [referrerUrl, setReferrerUrl] = useState<string | null>(null);
 
   const {
     authMethod,
@@ -40,6 +41,17 @@ export default function IndexView() {
   } = useAccounts();
 
   const error = authError || accountsError || sessionError;
+
+  // Store referrer URL when component mounts
+  useEffect(() => {
+    // Get the document referrer (the URL the user came from)
+    const referrer = document.referrer;
+    if (referrer && referrer !== '') {
+      setReferrerUrl(referrer);
+      // Also store in sessionStorage in case we need it elsewhere
+      sessionStorage.setItem('referrerUrl', referrer);
+    }
+  }, []);
 
   // Function to generate session signatures on-demand
   async function generateSessionSigs() {
@@ -103,13 +115,17 @@ export default function IndexView() {
         console.log('Agent PKP authentication method:', agentAuthMethod);
 
         const vincent = new VincentSDK()
+
+        if (!referrerUrl) {
+          throw new Error('Referrer URL is not set');
+        }
         
         const jwt = await vincent.createSignedJWT({
           pkpWallet: agentPkpWallet,
           pkp: agentPkpInfo,
           payload: { name: "User Name", customClaim: "value" },
           expiresInMinutes: 30,
-          audience: "example.com"
+          audience: referrerUrl
       });
 
         if (!jwt) {
@@ -117,11 +133,16 @@ export default function IndexView() {
         }
         console.log('JWT created:', jwt);
 
-        const verifyJwt = await vincent.verifyJWT("example.com");
+        const verifyJwt = await vincent.verifyJWT(referrerUrl);
         if (!verifyJwt) {
           throw new Error('Failed to verify JWT');
         }
         console.log('JWT verified:', verifyJwt);
+        
+        // Redirect user after successful JWT generation and verification with JWT as query param
+        if (referrerUrl) {
+          window.location.href = `${referrerUrl}?jwt=${jwt}`;
+        }
         
         setAgentSessionSigs(agentPkpSessionSigs);
       } catch (agentError) {

@@ -9,6 +9,7 @@ import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { SessionSigs } from '@lit-protocol/types';
 import { ethers } from 'ethers';
 import { VincentSDK } from '@lit-protocol/vincent-sdk';
+import { useRouter } from 'next/router';
 
 // Define interfaces for the authentication info
 interface AuthInfo {
@@ -24,11 +25,19 @@ interface AuthInfo {
  * A streamlined SessionValidator component that validates session signatures on mount
  */
 const SessionValidator: React.FC = () => {
+  const router = useRouter();
   const [showPopup, setShowPopup] = useState(false);
   const [sessionSigs, setSessionSigs] = useState<SessionSigs | null>(null);
   const [authInfo, setAuthInfo] = useState<AuthInfo | null>(null);
+  const [referrerUrl, setReferrerUrl] = useState<string | null>(null);
 
   useEffect(() => {
+    // Try to get stored referrer URL from sessionStorage
+    const storedReferrer = sessionStorage.getItem('referrerUrl');
+    if (storedReferrer) {
+      setReferrerUrl(storedReferrer);
+    }
+    
     // Get auth info from localStorage
     try {
       const storedAuthInfo = localStorage.getItem('lit-auth-info');
@@ -45,6 +54,13 @@ const SessionValidator: React.FC = () => {
       try {
       // Try to get a wallet signature using the session capability object
       try {
+        // Check if lit-wallet-sig exists in localStorage first
+        const litWalletSig = localStorage.getItem('lit-wallet-sig');
+        if (!litWalletSig) {
+          console.log('Storage key "lit-wallet-sig" is missing. Skipping session validation.');
+          return; // Exit early if the key is missing
+        }
+        
         console.log('Generating wallet signature...');
         // Create lit resources for action execution and PKP signing
         const litResources = [
@@ -75,7 +91,9 @@ const SessionValidator: React.FC = () => {
           nonce: Date.now().toString(),
         });
 
-        console.log('walletSig', walletSig);
+        if (!walletSig) {
+          return;
+        }
         
         if (walletSig) {
           const attemptedSessionSigs = await litNodeClient.getSessionSigs({
@@ -137,6 +155,9 @@ const SessionValidator: React.FC = () => {
         console.log('Res:', res);
 
         const vincent = new VincentSDK();
+        if (!referrerUrl) {
+          throw new Error('Referrer URL is not set');
+        }
 
         console.log("authinfo", authInfo?.pkp);
         
@@ -145,8 +166,10 @@ const SessionValidator: React.FC = () => {
           pkp: authInfo?.pkp,
           payload: { name: "User Name", customClaim: "value" },
           expiresInMinutes: 30,
-          audience: "example.com"
+          audience: referrerUrl
         });
+
+        console.log("referrerUrl", referrerUrl);
 
         console.log("jwt", jwt);
 
@@ -154,12 +177,17 @@ const SessionValidator: React.FC = () => {
           throw new Error('Failed to create JWT');
         }
 
-        const verifyJwt = await vincent.verifyJWT("example.com");
+        const verifyJwt = await vincent.verifyJWT(referrerUrl);
         if (!verifyJwt) {
           throw new Error('Failed to verify JWT');
         }
 
         console.log("verifyJwt", verifyJwt);
+
+        // Redirect to referrer URL after successful JWT verification with JWT as query param
+        if (referrerUrl) {
+          window.location.href = `${referrerUrl}?jwt=${jwt}`;
+        }
       } catch (error) {
         console.error('Error in handleUseExistingAccount:', error);
         setShowPopup(false);
