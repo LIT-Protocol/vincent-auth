@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import useAuthenticate from '../hooks/useAuthenticate';
 import useAccounts from '../hooks/useAccounts';
-import { ORIGIN, registerWebAuthn, getSessionSigs, cleanupSession, SELECTED_LIT_NETWORK, litNodeClient } from '../utils/lit';
+import { registerWebAuthn, getSessionSigs, cleanupSession, SELECTED_LIT_NETWORK, litNodeClient } from '../utils/lit';
 import { AUTH_METHOD_TYPE } from '@lit-protocol/constants';
 import Dashboard from '../components/Dashboard';
 import Loading from '../components/Loading';
@@ -11,6 +11,7 @@ import { SessionSigs, IRelayPKP } from '@lit-protocol/types';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { EthWalletProvider } from '@lit-protocol/lit-auth-client';
 import { getAgentPKP } from '../utils/getAgentPKP';
+import { VincentSDK } from '@lit-protocol/vincent-sdk';
 
 export default function IndexView() {
   const router = useRouter();
@@ -100,6 +101,28 @@ export default function IndexView() {
           litNodeClient
         });
         console.log('Agent PKP authentication method:', agentAuthMethod);
+
+        const vincent = new VincentSDK()
+        
+        const jwt = await vincent.createSignedJWT({
+          pkpWallet: agentPkpWallet,
+          pkp: agentPkpInfo,
+          payload: { name: "User Name", customClaim: "value" },
+          expiresInMinutes: 30,
+          audience: "example.com"
+      });
+
+        if (!jwt) {
+          throw new Error('Failed to create JWT');
+        }
+        console.log('JWT created:', jwt);
+
+        const verifyJwt = await vincent.verifyJWT("example.com");
+        if (!verifyJwt) {
+          throw new Error('Failed to verify JWT');
+        }
+        console.log('JWT verified:', verifyJwt);
+        
         setAgentSessionSigs(agentPkpSessionSigs);
       } catch (agentError) {
         console.error('Error handling Agent PKP:', agentError);
@@ -182,6 +205,21 @@ export default function IndexView() {
 
   // Authenticated states
   if (currentAccount && sessionSigs) {
+    // Save the PKP info in localStorage for SessionValidator to use
+    try {
+      const storedAuthInfo = localStorage.getItem('lit-auth-info');
+      if (storedAuthInfo) {
+        const authInfo = JSON.parse(storedAuthInfo);
+        
+        // Add PKP info to the existing auth info
+        authInfo.pkp = currentAccount;
+        localStorage.setItem('lit-auth-info', JSON.stringify(authInfo));
+        console.log('Updated auth info with PKP public keys:', authInfo);
+      }
+    } catch (error) {
+      console.error('Error saving PKP info to localStorage:', error);
+    }
+    
     return (
       <Dashboard 
         currentAccount={currentAccount} 

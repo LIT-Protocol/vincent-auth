@@ -8,6 +8,7 @@ import { disconnectWeb3 } from '@lit-protocol/auth-browser';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { SessionSigs } from '@lit-protocol/types';
 import { ethers } from 'ethers';
+import { VincentSDK } from '@lit-protocol/vincent-sdk';
 
 // Define interfaces for the authentication info
 interface AuthInfo {
@@ -15,8 +16,8 @@ interface AuthInfo {
   authenticatedAt: string;
   credentialId?: string;
   authMethodType?: number;
+  pkp?: any;
   value?: string;
-  userId?: string;
 }
 
 /**
@@ -120,16 +121,52 @@ const SessionValidator: React.FC = () => {
   // Handle user's choice to use existing account
   const handleUseExistingAccount = async () => {
     if (sessionSigs) {
-      const agentPkpWallet = new PKPEthersWallet({
-        controllerSessionSigs: sessionSigs,
-        pkpPubKey: "0x0457da254b8764dfcc17e7a8bee6c9e724a2f247efdb48464d94e3bb38c9fa2d0138910d69778d4313e15ff481fe58622a128750907ba24d608b458668a41e9519",
-        litNodeClient: litNodeClient,
-      });
-      await agentPkpWallet.init();
-      const res = await agentPkpWallet.signMessage("Hello, world!");
-      console.log('Res:', res);
+      try {
+        // Use PKP public key from stored auth info instead of hardcoded value
+        const pkpPublicKey = authInfo?.pkp.publicKey!
+        
+        console.log('Using PKP public key:', pkpPublicKey);
+        
+        const agentPkpWallet = new PKPEthersWallet({
+          controllerSessionSigs: sessionSigs,
+          pkpPubKey: pkpPublicKey,
+          litNodeClient: litNodeClient,
+        });
+        await agentPkpWallet.init();
+        const res = await agentPkpWallet.signMessage("Hello, world!");
+        console.log('Res:', res);
+
+        const vincent = new VincentSDK();
+
+        console.log("authinfo", authInfo?.pkp);
+        
+        const jwt = await vincent.createSignedJWT({
+          pkpWallet: agentPkpWallet,
+          pkp: authInfo?.pkp,
+          payload: { name: "User Name", customClaim: "value" },
+          expiresInMinutes: 30,
+          audience: "example.com"
+        });
+
+        console.log("jwt", jwt);
+
+        if (!jwt) {
+          throw new Error('Failed to create JWT');
+        }
+
+        const verifyJwt = await vincent.verifyJWT("example.com");
+        if (!verifyJwt) {
+          throw new Error('Failed to verify JWT');
+        }
+
+        console.log("verifyJwt", verifyJwt);
+      } catch (error) {
+        console.error('Error in handleUseExistingAccount:', error);
+        setShowPopup(false);
+      }
+    } else {
+      setShowPopup(false);
     }
-    setShowPopup(false);
   };
   
   // Handle user's choice to sign out

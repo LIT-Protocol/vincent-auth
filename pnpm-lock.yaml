@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@lit-protocol/auth-browser':
+        specifier: ^7.0.7
+        version: 7.0.8(typescript@5.3.3)
       '@lit-protocol/auth-helpers':
         specifier: ^7.0.0
         version: 7.0.6(typescript@5.3.3)
@@ -29,6 +32,9 @@ importers:
       '@lit-protocol/types':
         specifier: ^7.0.0
         version: 7.0.6
+      '@lit-protocol/vincent-sdk':
+        specifier: 0.1.0-1
+        version: 0.1.0-1
       '@radix-ui/react-radio-group':
         specifier: ^1.1.3
         version: 1.2.3(@types/react@18.0.31)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
@@ -242,14 +248,23 @@ packages:
   '@lit-protocol/accs-schemas@0.0.22':
     resolution: {integrity: sha512-c3LPDE8g8COt8FdXx+Nfv4CvEvP+QcHh94HZcukcttjZyu6jjICecq/XMXWVUSMGhAVWRMH8tBbjpHzElB45QQ==}
 
+  '@lit-protocol/accs-schemas@0.0.24':
+    resolution: {integrity: sha512-sjUfMAc8kj/Tj/GAFnlrbvs9PzoSK5wR3L1hK4kFI6lifq31LsDGqNLWmIEDXRubE/YusK5QaY30h+WPgk8RFQ==}
+
   '@lit-protocol/auth-browser@7.0.6':
     resolution: {integrity: sha512-ut5OpMwSNTqFj5/Nb4iLEoG3w6PGjCBoH4yu0+y2HP/h8mNj9qtcT6qZtpA8MVoKlDrUcAWRF4oVqL6d14u07w==}
+
+  '@lit-protocol/auth-browser@7.0.8':
+    resolution: {integrity: sha512-cHyoEj/Q+ka38Gzv8zE8VGAp7YVj1bdjANHD6EAqqsCbI/yuLkqkFEfzlj10+uqqmHI3yMrk5Pwqw8mxrm4jBg==}
 
   '@lit-protocol/auth-helpers@7.0.6':
     resolution: {integrity: sha512-DRyO9bMeFewnsw2WIqNK5sGboiO4a7zakpN2hhuIIQzu5ukb8QbX0DloSnhm5pCKrw3lw/PG523GHVd92xnpgA==}
 
   '@lit-protocol/constants@7.0.6':
     resolution: {integrity: sha512-ZU0V3Ixw/xzHtPnRCK6lf8PdU9P6PyfhQQ8AEeQ7Eygh5dOBA0IFC7hArTa/If/+BssWPdsj5vwIdwKOgIbTMQ==}
+
+  '@lit-protocol/constants@7.0.8':
+    resolution: {integrity: sha512-g90LKlbPIR6PsSxZltqLOJz24Fp6UqjAwcY7tL6FIp38VBtsFAmGnrDwp7Tf0aobRpEQ1smWyVR0yh+LDMgbOw==}
 
   '@lit-protocol/contracts-sdk@7.0.6':
     resolution: {integrity: sha512-U87r7JcZFj4i0VhHnVysLrqpWJUEpE7PzqVOLjI6QrqLUGlSAxxDeKL5FHcrK/ZTf7h33pVGQ/DydwIXJPZHeA==}
@@ -277,11 +292,20 @@ packages:
   '@lit-protocol/logger@7.0.6':
     resolution: {integrity: sha512-dj8FAjpB+o46IIFHxH7++wUhUjzlXAJ2GXltj9RWcoAag6sPZftiLnDxZyU2RzqWLI1K2gtYuYn7aAOO94sgXA==}
 
+  '@lit-protocol/logger@7.0.8':
+    resolution: {integrity: sha512-b6xb2GBCAJOCZX1dXMObQpA40Aeq4oNadh3slTglGTbM3gG47v/wZjOaLdOGU2cGjBObq5Jp7HuGKY4EJgMLhQ==}
+
   '@lit-protocol/misc-browser@7.0.6':
     resolution: {integrity: sha512-E7ZhF6aG3Jl7K2ua2x/w8mLupPv345m1FrfvNdet1iIqwddV2q+2rQFgh0fO7lfxRvXuiteGuBvL9ecPPLRecw==}
 
+  '@lit-protocol/misc-browser@7.0.8':
+    resolution: {integrity: sha512-Efe+bgCGG0CyRBJPHq6fmIr+f+7qckV6tAahEXLqQCdbSw4bRx6VOJ5SprYQPud7TIMxD41x4qzkBScOExJ8EQ==}
+
   '@lit-protocol/misc@7.0.6':
     resolution: {integrity: sha512-wJJHS3XJZXCofBxtRiMOdSfcE55eZxoqyVbiE57qKlMoVWLBQdv4LUExaWdrmVZBPKLdShFfBCtz0sAMagrOyg==}
+
+  '@lit-protocol/misc@7.0.8':
+    resolution: {integrity: sha512-9tOtKHIv+5dY0ykU1mmk3BC6Q+as+/AU35ZAChjsdLfWNXZ0FiBh2jfTZvbtB/xaiz12Pw0Kn5uKCL+PSPsJqA==}
 
   '@lit-protocol/nacl@7.0.6':
     resolution: {integrity: sha512-KjO6NzKQIlHNF1utIQvsHFVHtKCGVPjotxIC6DAjU/9ddNKBRKggJyP2AhFIinavldy38hgtikeNuZdUcg5z7A==}
@@ -295,8 +319,17 @@ packages:
   '@lit-protocol/types@7.0.6':
     resolution: {integrity: sha512-PT0m2hQuPhaXoDURsJkeUF8Nq8s4JGeamGmxLMLSLCoctXrFWBiCjw5GDOYLoFe3cEHPQSj19rm9mzyjxkqQ8g==}
 
+  '@lit-protocol/types@7.0.8':
+    resolution: {integrity: sha512-7D6APatocVK1NELpkVu4j8UCAonO4pcudJbB7HAtpujC9huCmrFbyKWnDXlUIKsS3QkyHB+lX9Yg7Q3W9bgedw==}
+
   '@lit-protocol/uint8arrays@7.0.6':
     resolution: {integrity: sha512-oglAr1abSsDLPKehFx4MKK3dXxvt+G45sPyb+kAjryq+MxoNhHMs5IyBgmrWiSjcB3dyuBxnwErKygbyRtj1aQ==}
+
+  '@lit-protocol/uint8arrays@7.0.8':
+    resolution: {integrity: sha512-e5D3kw+BuaKwreD3Wgn7Cvke67m3IR8qVMW5bhf4UqpjxF1nHjfoZsjdJu1R6FMxSw0vzxkcMOjm8CwVdMULuQ==}
+
+  '@lit-protocol/vincent-sdk@0.1.0-1':
+    resolution: {integrity: sha512-V8XWRAkhoZo4IuYvTus1/akPy43m/ZBdYN8BsfUgVvGMOUt9RCYcesuLPA8SLifrU7ytRfrhU9k40pr/a77V5g==}
 
   '@lit-protocol/wasm@7.0.6':
     resolution: {integrity: sha512-iZezuneICRvk+0+eh7me51vRH5i1qNmYxztEPfRkzxgWRnoRfqeLcSbMNGdo+Y+HCOJTon1+y1d7qrnZnE9r5g==}
@@ -3296,6 +3329,10 @@ snapshots:
     dependencies:
       ajv: 8.17.1
 
+  '@lit-protocol/accs-schemas@0.0.24':
+    dependencies:
+      ajv: 8.17.1
+
   '@lit-protocol/auth-browser@7.0.6(typescript@5.3.3)':
     dependencies:
       '@ethersproject/abstract-provider': 5.7.0
@@ -3311,6 +3348,32 @@ snapshots:
       '@lit-protocol/misc-browser': 7.0.6(typescript@5.3.3)
       '@lit-protocol/types': 7.0.6
       '@lit-protocol/uint8arrays': 7.0.6(typescript@5.3.3)
+      '@openagenda/verror': 3.1.4
+      ajv: 8.17.1
+      bech32: 2.0.0
+      depd: 2.0.0
+      ethers: 5.7.2
+      tslib: 1.14.1
+    transitivePeerDependencies:
+      - bufferutil
+      - typescript
+      - utf-8-validate
+
+  '@lit-protocol/auth-browser@7.0.8(typescript@5.3.3)':
+    dependencies:
+      '@ethersproject/abstract-provider': 5.7.0
+      '@ethersproject/bytes': 5.7.0
+      '@ethersproject/contracts': 5.7.0
+      '@ethersproject/providers': 5.7.2
+      '@ethersproject/strings': 5.7.0
+      '@ethersproject/wallet': 5.7.0
+      '@lit-protocol/accs-schemas': 0.0.24
+      '@lit-protocol/constants': 7.0.8(typescript@5.3.3)
+      '@lit-protocol/logger': 7.0.8(typescript@5.3.3)
+      '@lit-protocol/misc': 7.0.8(typescript@5.3.3)
+      '@lit-protocol/misc-browser': 7.0.8(typescript@5.3.3)
+      '@lit-protocol/types': 7.0.8
+      '@lit-protocol/uint8arrays': 7.0.8(typescript@5.3.3)
       '@openagenda/verror': 3.1.4
       ajv: 8.17.1
       bech32: 2.0.0
@@ -3355,6 +3418,22 @@ snapshots:
       '@lit-protocol/accs-schemas': 0.0.22
       '@lit-protocol/contracts': 0.0.74(typescript@5.3.3)
       '@lit-protocol/types': 7.0.6
+      '@openagenda/verror': 3.1.4
+      depd: 2.0.0
+      ethers: 5.7.2
+      siwe: 2.3.2(ethers@5.7.2)
+      tslib: 1.14.1
+    transitivePeerDependencies:
+      - bufferutil
+      - typescript
+      - utf-8-validate
+
+  '@lit-protocol/constants@7.0.8(typescript@5.3.3)':
+    dependencies:
+      '@ethersproject/abstract-provider': 5.7.0
+      '@lit-protocol/accs-schemas': 0.0.24
+      '@lit-protocol/contracts': 0.0.74(typescript@5.3.3)
+      '@lit-protocol/types': 7.0.8
       '@openagenda/verror': 3.1.4
       depd: 2.0.0
       ethers: 5.7.2
@@ -3662,6 +3741,23 @@ snapshots:
       - typescript
       - utf-8-validate
 
+  '@lit-protocol/logger@7.0.8(typescript@5.3.3)':
+    dependencies:
+      '@ethersproject/abstract-provider': 5.7.0
+      '@lit-protocol/accs-schemas': 0.0.24
+      '@lit-protocol/constants': 7.0.8(typescript@5.3.3)
+      '@lit-protocol/contracts': 0.0.74(typescript@5.3.3)
+      '@lit-protocol/types': 7.0.8
+      '@openagenda/verror': 3.1.4
+      depd: 2.0.0
+      ethers: 5.7.2
+      siwe: 2.3.2(ethers@5.7.2)
+      tslib: 1.14.1
+    transitivePeerDependencies:
+      - bufferutil
+      - typescript
+      - utf-8-validate
+
   '@lit-protocol/misc-browser@7.0.6(typescript@5.3.3)':
     dependencies:
       '@ethersproject/abstract-provider': 5.7.0
@@ -3670,6 +3766,24 @@ snapshots:
       '@lit-protocol/contracts': 0.0.74(typescript@5.3.3)
       '@lit-protocol/types': 7.0.6
       '@lit-protocol/uint8arrays': 7.0.6(typescript@5.3.3)
+      '@openagenda/verror': 3.1.4
+      depd: 2.0.0
+      ethers: 5.7.2
+      siwe: 2.3.2(ethers@5.7.2)
+      tslib: 1.14.1
+    transitivePeerDependencies:
+      - bufferutil
+      - typescript
+      - utf-8-validate
+
+  '@lit-protocol/misc-browser@7.0.8(typescript@5.3.3)':
+    dependencies:
+      '@ethersproject/abstract-provider': 5.7.0
+      '@lit-protocol/accs-schemas': 0.0.24
+      '@lit-protocol/constants': 7.0.8(typescript@5.3.3)
+      '@lit-protocol/contracts': 0.0.74(typescript@5.3.3)
+      '@lit-protocol/types': 7.0.8
+      '@lit-protocol/uint8arrays': 7.0.8(typescript@5.3.3)
       '@openagenda/verror': 3.1.4
       depd: 2.0.0
       ethers: 5.7.2
@@ -3690,6 +3804,29 @@ snapshots:
       '@lit-protocol/contracts': 0.0.74(typescript@5.3.3)
       '@lit-protocol/logger': 7.0.6(typescript@5.3.3)
       '@lit-protocol/types': 7.0.6
+      '@openagenda/verror': 3.1.4
+      ajv: 8.17.1
+      bech32: 2.0.0
+      depd: 2.0.0
+      ethers: 5.7.2
+      siwe: 2.3.2(ethers@5.7.2)
+      tslib: 1.14.1
+      util: 0.12.5
+    transitivePeerDependencies:
+      - bufferutil
+      - typescript
+      - utf-8-validate
+
+  '@lit-protocol/misc@7.0.8(typescript@5.3.3)':
+    dependencies:
+      '@ethersproject/abstract-provider': 5.7.0
+      '@ethersproject/contracts': 5.7.0
+      '@ethersproject/providers': 5.7.2
+      '@lit-protocol/accs-schemas': 0.0.24
+      '@lit-protocol/constants': 7.0.8(typescript@5.3.3)
+      '@lit-protocol/contracts': 0.0.74(typescript@5.3.3)
+      '@lit-protocol/logger': 7.0.8(typescript@5.3.3)
+      '@lit-protocol/types': 7.0.8
       '@openagenda/verror': 3.1.4
       ajv: 8.17.1
       bech32: 2.0.0
@@ -3873,6 +4010,18 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
+  '@lit-protocol/types@7.0.8':
+    dependencies:
+      '@ethersproject/abstract-provider': 5.7.0
+      '@lit-protocol/accs-schemas': 0.0.24
+      depd: 2.0.0
+      ethers: 5.7.2
+      siwe: 2.3.2(ethers@5.7.2)
+      tslib: 1.14.1
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
+
   '@lit-protocol/uint8arrays@7.0.6(typescript@5.3.3)':
     dependencies:
       '@ethersproject/abstract-provider': 5.7.0
@@ -3889,6 +4038,25 @@ snapshots:
       - bufferutil
       - typescript
       - utf-8-validate
+
+  '@lit-protocol/uint8arrays@7.0.8(typescript@5.3.3)':
+    dependencies:
+      '@ethersproject/abstract-provider': 5.7.0
+      '@lit-protocol/accs-schemas': 0.0.24
+      '@lit-protocol/constants': 7.0.8(typescript@5.3.3)
+      '@lit-protocol/contracts': 0.0.74(typescript@5.3.3)
+      '@lit-protocol/types': 7.0.8
+      '@openagenda/verror': 3.1.4
+      depd: 2.0.0
+      ethers: 5.7.2
+      siwe: 2.3.2(ethers@5.7.2)
+      tslib: 1.14.1
+    transitivePeerDependencies:
+      - bufferutil
+      - typescript
+      - utf-8-validate
+
+  '@lit-protocol/vincent-sdk@0.1.0-1': {}
 
   '@lit-protocol/wasm@7.0.6':
     dependencies:
