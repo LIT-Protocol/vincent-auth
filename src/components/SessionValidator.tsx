@@ -239,6 +239,9 @@ const SessionValidator: React.FC = () => {
       ? new Date(authInfo.authenticatedAt).toLocaleString() 
       : 'Unknown time';
 
+    // Get PKP Ethereum address for display
+    const pkpEthAddress = authInfo.pkp?.ethAddress || 'Not available';
+
     return (
       <div className="auth-info">
         <h4>Authentication Method</h4>
@@ -248,6 +251,10 @@ const SessionValidator: React.FC = () => {
         {authInfo.authMethodType !== undefined && (
           <p className="auth-method-type">Auth Method Type: {authInfo.authMethodType}</p>
         )}
+        <div className="pkp-key">
+          <p><strong>Account Ethereum Address:</strong></p>
+          <p className="pkp-key-value">{pkpEthAddress}</p>
+        </div>
       </div>
     );
   };
@@ -289,7 +296,7 @@ const SessionValidator: React.FC = () => {
               padding: 24px;
               border-radius: 8px;
               box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-              max-width: 400px;
+              max-width: 480px;
               width: 100%;
               text-align: center;
             }
@@ -317,6 +324,20 @@ const SessionValidator: React.FC = () => {
               font-size: 0.85rem;
               color: #6b7280;
               margin-top: 4px;
+            }
+            .pkp-key {
+              margin-top: 12px;
+              border-top: 1px solid #e5e7eb;
+              padding-top: 12px;
+            }
+            .pkp-key-value {
+              font-family: monospace;
+              font-size: 0.8rem;
+              word-break: break-all;
+              background-color: #e5e7eb;
+              padding: 8px;
+              border-radius: 4px;
+              overflow-wrap: break-word;
             }
             .session-popup-buttons {
               display: flex;
