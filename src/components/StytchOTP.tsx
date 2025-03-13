@@ -55,7 +55,6 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
         session_duration_minutes: 60,
       });
       
-      // Store the email/phone in localStorage
       try {
         const authInfo = {
           type: method,
@@ -101,7 +100,7 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
                 name={method}
                 className="form__input"
                 placeholder={
-                  method === 'email' ? 'Your email' : 'Your phone number'
+                  method === 'email' ? 'Your email' : 'Your phone number (e.g. +12025551234)'
                 }
                 autoComplete="off"
               ></input>

@@ -9,7 +9,6 @@ import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { SessionSigs } from '@lit-protocol/types';
 import { ethers } from 'ethers';
 import { VincentSDK } from '@lit-protocol/vincent-sdk';
-import { useRouter } from 'next/router';
 
 // Define interfaces for the authentication info
 interface AuthInfo {
@@ -25,7 +24,6 @@ interface AuthInfo {
  * A streamlined SessionValidator component that validates session signatures on mount
  */
 const SessionValidator: React.FC = () => {
-  const router = useRouter();
   const [showPopup, setShowPopup] = useState(false);
   const [sessionSigs, setSessionSigs] = useState<SessionSigs | null>(null);
   const [authInfo, setAuthInfo] = useState<AuthInfo | null>(null);
@@ -151,8 +149,6 @@ const SessionValidator: React.FC = () => {
           litNodeClient: litNodeClient,
         });
         await agentPkpWallet.init();
-        const res = await agentPkpWallet.signMessage("Hello, world!");
-        console.log('Res:', res);
 
         const vincent = new VincentSDK();
         if (!referrerUrl) {

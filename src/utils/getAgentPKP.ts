@@ -1,4 +1,3 @@
-import { ethers } from 'ethers';
 import { IRelayPKP } from '@lit-protocol/types';
 import { getPkpNftContract } from './get-pkp-nft-contract';
 import { SELECTED_LIT_NETWORK } from './lit';
@@ -15,34 +14,22 @@ import { SELECTED_LIT_NETWORK } from './lit';
  */
 export async function getAgentPKP(userAddress: string): Promise<IRelayPKP> {
   try {
-    // Get the PKP NFT contract instance
     const pkpNftContract = getPkpNftContract(SELECTED_LIT_NETWORK);
-    
-    // Get the balance of PKPs owned by this address
+
     const balance = await pkpNftContract.balanceOf(userAddress);
-    
-    // Check if the user owns any PKPs
     if (balance.toNumber() === 0) {
       throw new Error('No PKPs found for this user');
     }
     
-    // Iterate through each PKP owned by the user
     for (let i = 0; i < balance.toNumber(); i++) {
-      // Get the token ID at the current index
       const tokenId = await pkpNftContract.tokenOfOwnerByIndex(userAddress, i);
-      
-      // Get the public key for this token
       const publicKey = await pkpNftContract.getPubkey(tokenId);
-      
-      // Get the ETH address for this token
       const ethAddress = await pkpNftContract.getEthAddress(tokenId);
       
-      // Skip if this is the user's current PKP (same ETH address)
       if (ethAddress.toLowerCase() === userAddress.toLowerCase()) {
         continue;
       }
       
-      // Return the first PKP that's not the user's current PKP
       return {
         tokenId: tokenId.toString(),
         publicKey,

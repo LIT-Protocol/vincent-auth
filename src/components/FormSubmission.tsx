@@ -4,8 +4,6 @@ import { litNodeClient, mintPKPToExistingPKP, getSessionSigs, SELECTED_LIT_NETWO
 import { LitContracts } from '@lit-protocol/contracts-sdk';
 import type { ConsentFormData } from './ConsentForm';
 import { ethers } from 'ethers';
-import { getAgentRegistryContract } from '../utils/get-agent-registry-contract';
-import { getAppDelegationRegistryContract } from '../utils/get-app-delegation-registry';
 import { LIT_RPC, AUTH_METHOD_SCOPE } from "@lit-protocol/constants";
 import { EthWalletProvider } from '@lit-protocol/lit-auth-client';
 import { getPkpNftContract } from '../utils/get-pkp-nft-contract';
@@ -82,21 +80,12 @@ export default function FormSubmission({
       userPkpWallet.provider = provider;
       console.log('Provider assigned to wallets:', provider.connection.url);
 
+      /*
       const agentRegistryContract = await getAgentRegistryContract();
       // Connect the contract with the wallet as signer
       const connectedContract = agentRegistryContract.connect(userPkpWallet);
       console.log('Contract connected with signer:', userPkpWallet.address);
-
-      // Hardcode both management wallet and roleId
-      const managementWallet = '0xD4383c15158B11a4Fa51F489ABCB3D4E43511b0a';
-      // Convert roleId to bytes32
-      const roleIdBytes32 = ethers.utils.formatBytes32String('a5b83467-4ac9-49b6-b45c-28552f51b026'.slice(0, 31));
-      
-      console.log('Using form data:', {
-        managementWallet,
-        roleId: roleIdBytes32,
-        policyParams: formData.policyParams
-      });
+      */
 
       // Prepare policy parameters from form data - needs to be string[][] and bytes[][]
       const policyParamNames = Object.keys(formData.policyParams || {}).map(key => [key]);
@@ -108,29 +97,8 @@ export default function FormSubmission({
         )
       ]);
 
-      // Use hardcoded values for contract call
-/*
-      const ownerOf = await PKP_NFT_FACET.ownerOf(tokenId);
-      console.log("ownerOf", ownerOf);
-      console.log("tokenId", tokenId);
-      console.log("managementWallet", managementWallet);
-      console.log("roleIdBytes32", roleIdBytes32);
-      console.log("policyParamNames", policyParamNames);
-      console.log("policyValues", policyValues);
-      console.log("PKPEthersWallet", userPkpWallet.address);
-      const gasLimit = await estimateGasLimit(
-        agentRegistryContract.estimateGas.addRole,
-        tokenId.toString(),
-        managementWallet,
-        roleIdBytes32,
-        '1',
-        ['Qmap3Qadj4FBPhSEor1rbnNdbZSE56ptFS7KH4XS716oJg'],
-        policyParamNames,
-        policyValues
-      );
-*/
-      //console.log("gasLimit", gasLimit);
 
+      /*
       const tx = await connectedContract.addRole(
         tokenId,
         managementWallet,
@@ -159,6 +127,7 @@ export default function FormSubmission({
       })
 
       console.log("actionTx", actionTx);
+      */
 
       if (onSuccess) {
         console.log('Calling onSuccess callback...');

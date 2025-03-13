@@ -25,6 +25,7 @@ import { LitActionResource, LitPKPResource } from '@lit-protocol/auth-helpers';
 import { ethers } from 'ethers';
 import { getPkpNftContract } from './get-pkp-nft-contract';
 import { LitContracts } from '@lit-protocol/contracts-sdk';
+import { addPayee } from './addPayee';
 
 export const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || 'localhost';
 export const ORIGIN =
@@ -334,6 +335,12 @@ export async function mintPKP(authMethod: AuthMethod): Promise<IRelayPKP> {
     ethAddress: response.pkpEthAddress,
   };
 
+  try {
+    await addPayee(newPKP.ethAddress);
+  } catch (err) {
+    console.warn('Failed to add payee', err);
+  }
+
   return newPKP;
 }
 
@@ -398,12 +405,6 @@ export async function mintPKPToExistingPKP(pkp: IRelayPKP): Promise<IRelayPKP> {
   const tokenId = pkpNft.interface.parseLog(mintEvent).args.tokenId;
   if (!tokenId) {
     throw new Error("Token ID not found in mint event");
-  }
-
-  // Verify ownership
-  const owner = await pkpNft.ownerOf(tokenId);
-  if (owner.toLowerCase() !== requestBody.sendToAddressAfterMinting.toLowerCase()) {
-    throw new Error("PKP ownership verification failed");
   }
 
   // Get the public key and eth address from the PKP NFT contract
