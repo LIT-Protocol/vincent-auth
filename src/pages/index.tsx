@@ -85,7 +85,7 @@ export default function IndexView() {
         console.log('User PKP details:', currentAccount);
         console.log('Agent PKP details:', agentPkpInfo);
 
-        /*
+        
         // Authenticate with EthWalletProvider
         console.log('Authenticating with EthWalletProvider...');
         const authMethodForAgent = await EthWalletProvider.authenticate({
@@ -101,10 +101,10 @@ export default function IndexView() {
           pkpPublicKey: agentPkpInfo.publicKey,
           authMethod: authMethodForAgent,
         });
-        console.log('Agent PKP session sigs:', agentPkpSessionSigs);*/
+        console.log('Agent PKP session sigs:', agentPkpSessionSigs);
 
         const agentPkpWallet = new PKPEthersWallet({
-          controllerSessionSigs: sigs,
+          controllerSessionSigs: agentPkpSessionSigs,
           pkpPubKey: agentPkpInfo.publicKey,
           litNodeClient: litNodeClient,
         });
@@ -146,7 +146,7 @@ export default function IndexView() {
           window.location.href = `${referrerUrl}?jwt=${jwt}`;
         }
         
-        setAgentSessionSigs(sigs);
+        setAgentSessionSigs(agentPkpSessionSigs);
       } catch (agentError) {
         console.error('Error handling Agent PKP:', agentError);
         // Don't set session error - we can still proceed with just the user PKP

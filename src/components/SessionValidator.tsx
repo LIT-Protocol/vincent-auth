@@ -72,13 +72,6 @@ const SessionValidator: React.FC = () => {
         // Generate session capability object with wildcards
         const sessionCapabilityObject = await litNodeClient.generateSessionCapabilityObjectWithWildcards(litResources);
 
-        const ethersWallet = new ethers.Wallet("0x867266a73bfc47cf6d739d9732824441f060f042ea912f0043a87d28077193d2");
-        const { capacityDelegationAuthSig } =
-        await litNodeClient.createCapacityDelegationAuthSig({
-          dAppOwnerWallet: ethersWallet,
-          capacityTokenId: "142580",
-        });
-        
         // Get wallet signature
         const walletSig = await litNodeClient.getWalletSig({
           chain: "ethereum",
@@ -95,7 +88,7 @@ const SessionValidator: React.FC = () => {
         
         if (walletSig) {
           const attemptedSessionSigs = await litNodeClient.getSessionSigs({
-            capabilityAuthSigs: [walletSig, capacityDelegationAuthSig],
+            capabilityAuthSigs: [walletSig],
             resourceAbilityRequests: [
               {
                 resource: new LitActionResource('*'),

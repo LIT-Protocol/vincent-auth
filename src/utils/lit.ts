@@ -172,6 +172,13 @@ export async function registerWebAuthn(): Promise<IRelayPKP> {
     ethAddress: userResponse.pkpEthAddress,
   };
 
+  try {
+    await addPayee(newUserPKP.ethAddress);
+    console.log('Added payee', newUserPKP.ethAddress);
+  } catch (err) {
+    console.warn('Failed to add payee', err);
+  }
+
   console.log('newUserPKP', newUserPKP);
 
   // Mint a new PKP to be controlled by the new user PKP
@@ -216,13 +223,6 @@ export async function getSessionSigs({
 }): Promise<SessionSigs> {
   await litNodeClient.connect();
 
-  const ethersWallet = new ethers.Wallet("0x867266a73bfc47cf6d739d9732824441f060f042ea912f0043a87d28077193d2");
-  const { capacityDelegationAuthSig } =
-  await litNodeClient.createCapacityDelegationAuthSig({
-    dAppOwnerWallet: ethersWallet,
-    capacityTokenId: "142580",
-  });
-
 
   const sessionSigs = await litNodeClient.getPkpSessionSigs({
     chain: 'ethereum',
@@ -231,7 +231,6 @@ export async function getSessionSigs({
     ).toISOString(), // 15 minutes
     pkpPublicKey,
     authMethods: [authMethod],
-    capabilityAuthSigs: [capacityDelegationAuthSig],
     resourceAbilityRequests: [
       {
         resource: new LitActionResource('*'),
@@ -337,6 +336,7 @@ export async function mintPKP(authMethod: AuthMethod): Promise<IRelayPKP> {
 
   try {
     await addPayee(newPKP.ethAddress);
+    console.log('Added payee', newPKP.ethAddress);
   } catch (err) {
     console.warn('Failed to add payee', err);
   }
@@ -416,6 +416,13 @@ export async function mintPKPToExistingPKP(pkp: IRelayPKP): Promise<IRelayPKP> {
     publicKey,
     ethAddress,
   };
+
+  try {
+    await addPayee(agentPKP.ethAddress);
+    console.log('Added payee', agentPKP.ethAddress);
+  } catch (err) {
+    console.warn('Failed to add payee', err);
+  }
 
   return agentPKP;
 }
