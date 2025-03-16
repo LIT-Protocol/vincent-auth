@@ -55,7 +55,6 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
         session_duration_minutes: 60,
       });
       
-      // Store the email/phone in localStorage
       try {
         const authInfo = {
           type: method,
@@ -81,11 +80,6 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
     <>
       {step === 'submit' && (
         <>
-          {error && (
-            <div className="alert alert--error">
-              <p>{error.message}</p>
-            </div>
-          )}
           <h1>Enter your {method}</h1>
           <p>A verification code will be sent to your {method}.</p>
           <div className="form-wrapper">
@@ -101,7 +95,7 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
                 name={method}
                 className="form__input"
                 placeholder={
-                  method === 'email' ? 'Your email' : 'Your phone number'
+                  method === 'email' ? 'Your email' : 'Your phone number (e.g. +12025551234)'
                 }
                 autoComplete="off"
               ></input>
@@ -109,12 +103,14 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
                 type="submit"
                 className="btn btn--primary"
                 disabled={loading}
+                style={{ marginBottom: '4px' }}
               >
                 Send code
               </button>
               <button
                 onClick={() => setView('default')}
-                className="btn btn--link"
+                className="btn btn--outline"
+                style={{ marginTop: '0px' }}
               >
                 Back
               </button>
@@ -141,12 +137,13 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
                 placeholder="Verification code"
                 autoComplete="off"
               ></input>
-              <button type="submit" className="btn btn--primary">
+              <button type="submit" className="btn btn--primary" style={{ marginBottom: '4px' }}>
                 Verify
               </button>
               <button
                 onClick={() => setStep('submit')}
                 className="btn btn--outline"
+                style={{ marginTop: '0px' }}
               >
                 Try again
               </button>

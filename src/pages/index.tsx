@@ -2,16 +2,15 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import useAuthenticate from '../hooks/useAuthenticate';
 import useAccounts from '../hooks/useAccounts';
-import { registerWebAuthn, getSessionSigs, cleanupSession, SELECTED_LIT_NETWORK, litNodeClient } from '../utils/lit';
+import { registerWebAuthn, getSessionSigs, cleanupSession, litNodeClient } from '../utils/lit';
 import { AUTH_METHOD_TYPE } from '@lit-protocol/constants';
-import Dashboard from '../components/Dashboard';
+import AuthenticatedConsentForm from '../components/AuthenticatedConsentForm';
 import Loading from '../components/Loading';
 import LoginMethods from '../components/LoginMethods';
 import { SessionSigs, IRelayPKP } from '@lit-protocol/types';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { EthWalletProvider } from '@lit-protocol/lit-auth-client';
 import { getAgentPKP } from '../utils/getAgentPKP';
-import { VincentSDK } from '@lit-protocol/vincent-sdk';
 
 export default function IndexView() {
   const router = useRouter();
@@ -56,7 +55,7 @@ export default function IndexView() {
   // Function to generate session signatures on-demand
   async function generateSessionSigs() {
     if (!authMethod || !currentAccount) return;
-    
+
     setSessionLoading(true);
     setSessionError(undefined);
     try {
@@ -66,12 +65,12 @@ export default function IndexView() {
         authMethod
       });
       setSessionSigs(sigs);
-      
+
       // After getting user PKP session sigs, try to get the agent PKP
       try {
         const agentPkpInfo = await getAgentPKP(currentAccount.ethAddress);
         setAgentPKP(agentPkpInfo);
-        
+
         // Initialize the user PKP wallet
         console.log('Generating new agent session signatures...');
         console.log('Initializing user PKP wallet...');
@@ -85,6 +84,7 @@ export default function IndexView() {
         console.log('User PKP details:', currentAccount);
         console.log('Agent PKP details:', agentPkpInfo);
 
+
         // Authenticate with EthWalletProvider
         console.log('Authenticating with EthWalletProvider...');
         const authMethodForAgent = await EthWalletProvider.authenticate({
@@ -94,15 +94,18 @@ export default function IndexView() {
         console.log('Authentication method:', authMethodForAgent);
 
         // Derive session signatures for the agent PKP
+
+        /*
+
         console.log('Getting session signatures for Agent PKP...');
         const agentPkpSessionSigs = await getSessionSigs({
           pkpPublicKey: agentPkpInfo.publicKey,
           authMethod: authMethodForAgent,
         });
-        console.log('Agent PKP session sigs:', agentPkpSessionSigs);
+        console.log('Agent PKP session sigs:', agentPkpSessionSigs);*/
 
         const agentPkpWallet = new PKPEthersWallet({
-          controllerSessionSigs: agentPkpSessionSigs,
+          controllerSessionSigs: sessionSigs,
           pkpPubKey: agentPkpInfo.publicKey,
           litNodeClient: litNodeClient,
         });
@@ -114,37 +117,21 @@ export default function IndexView() {
         });
         console.log('Agent PKP authentication method:', agentAuthMethod);
 
-        const vincent = new VincentSDK()
-
-        if (!referrerUrl) {
-          throw new Error('Referrer URL is not set');
-        }
-        
-        const jwt = await vincent.createSignedJWT({
-          pkpWallet: agentPkpWallet,
-          pkp: agentPkpInfo,
-          payload: { name: "User Name", customClaim: "value" },
-          expiresInMinutes: 30,
-          audience: referrerUrl
-      });
-
-        if (!jwt) {
-          throw new Error('Failed to create JWT');
-        }
-        console.log('JWT created:', jwt);
-
-        const verifyJwt = await vincent.verifyJWT(referrerUrl);
-        if (!verifyJwt) {
-          throw new Error('Failed to verify JWT');
-        }
-        console.log('JWT verified:', verifyJwt);
-        
-        // Redirect user after successful JWT generation and verification with JWT as query param
         if (referrerUrl) {
-          window.location.href = `${referrerUrl}?jwt=${jwt}`;
+          try {
+            // Removed JWT generation code since it will happen in AuthenticatedConsentForm
+            // after user gives explicit consent
+
+            // Contract calls have been moved to the AuthenticatedConsentForm component
+            console.log('Referrer URL found, contract calls will be handled in AuthenticatedConsentForm');
+          } catch (error) {
+            console.error('Error:', error);
+          }
+        } else {
+          console.log('No referrer URL found, skipping app data lookup');
         }
-        
-        setAgentSessionSigs(agentPkpSessionSigs);
+
+        setAgentSessionSigs(sessionSigs);
       } catch (agentError) {
         console.error('Error handling Agent PKP:', agentError);
         // Don't set session error - we can still proceed with just the user PKP
@@ -169,14 +156,14 @@ export default function IndexView() {
       // Clean the managementWallet value
       const cleanManagementWallet = managementWallet.toString().split('?')[0];
       router.replace(
-        { 
-          pathname: window.location.pathname, 
-          query: { 
-            managementWallet: cleanManagementWallet, 
-            roleId 
-          } 
-        }, 
-        undefined, 
+        {
+          pathname: window.location.pathname,
+          query: {
+            managementWallet: cleanManagementWallet,
+            roleId
+          }
+        },
+        undefined,
         { shallow: true }
       );
     }
@@ -231,7 +218,7 @@ export default function IndexView() {
       const storedAuthInfo = localStorage.getItem('lit-auth-info');
       if (storedAuthInfo) {
         const authInfo = JSON.parse(storedAuthInfo);
-        
+
         // Add PKP info to the existing auth info
         authInfo.pkp = currentAccount;
         localStorage.setItem('lit-auth-info', JSON.stringify(authInfo));
@@ -240,14 +227,18 @@ export default function IndexView() {
     } catch (error) {
       console.error('Error saving PKP info to localStorage:', error);
     }
-    
+
     return (
-      <Dashboard 
-        currentAccount={currentAccount} 
-        sessionSigs={sessionSigs}
-        agentPKP={agentPKP}
-        agentSessionSigs={agentSessionSigs}
-      />
+      <div className="consent-form-overlay">
+        <div className="consent-form-modal">
+          <AuthenticatedConsentForm
+            currentAccount={currentAccount}
+            sessionSigs={sessionSigs}
+            agentPKP={agentPKP}
+            agentSessionSigs={agentSessionSigs}
+          />
+        </div>
+      </div>
     );
   }
 

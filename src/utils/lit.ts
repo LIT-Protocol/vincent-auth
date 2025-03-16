@@ -25,6 +25,7 @@ import { LitActionResource, LitPKPResource } from '@lit-protocol/auth-helpers';
 import { ethers } from 'ethers';
 import { getPkpNftContract } from './get-pkp-nft-contract';
 import { LitContracts } from '@lit-protocol/contracts-sdk';
+import { addPayee } from './addPayee';
 
 export const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || 'localhost';
 export const ORIGIN =
@@ -171,6 +172,13 @@ export async function registerWebAuthn(): Promise<IRelayPKP> {
     ethAddress: userResponse.pkpEthAddress,
   };
 
+  try {
+    await addPayee(newUserPKP.ethAddress);
+    console.log('Added payee', newUserPKP.ethAddress);
+  } catch (err) {
+    console.warn('Failed to add payee', err);
+  }
+
   console.log('newUserPKP', newUserPKP);
 
   // Mint a new PKP to be controlled by the new user PKP
@@ -222,15 +230,14 @@ export async function getSessionSigs({
     capacityTokenId: "142580",
   });
 
-
   const sessionSigs = await litNodeClient.getPkpSessionSigs({
     chain: 'ethereum',
+    capabilityAuthSigs: [capacityDelegationAuthSig],
     expiration: new Date(
       Date.now() + 1000 * 60 * 15
     ).toISOString(), // 15 minutes
     pkpPublicKey,
     authMethods: [authMethod],
-    capabilityAuthSigs: [capacityDelegationAuthSig],
     resourceAbilityRequests: [
       {
         resource: new LitActionResource('*'),
@@ -334,6 +341,13 @@ export async function mintPKP(authMethod: AuthMethod): Promise<IRelayPKP> {
     ethAddress: response.pkpEthAddress,
   };
 
+  try {
+    await addPayee(newPKP.ethAddress);
+    console.log('Added payee', newPKP.ethAddress);
+  } catch (err) {
+    console.warn('Failed to add payee', err);
+  }
+
   return newPKP;
 }
 
@@ -400,12 +414,6 @@ export async function mintPKPToExistingPKP(pkp: IRelayPKP): Promise<IRelayPKP> {
     throw new Error("Token ID not found in mint event");
   }
 
-  // Verify ownership
-  const owner = await pkpNft.ownerOf(tokenId);
-  if (owner.toLowerCase() !== requestBody.sendToAddressAfterMinting.toLowerCase()) {
-    throw new Error("PKP ownership verification failed");
-  }
-
   // Get the public key and eth address from the PKP NFT contract
   const publicKey = await pkpNft.getPubkey(tokenId);
   const ethAddress = ethers.utils.computeAddress(publicKey);
@@ -415,6 +423,13 @@ export async function mintPKPToExistingPKP(pkp: IRelayPKP): Promise<IRelayPKP> {
     publicKey,
     ethAddress,
   };
+
+  try {
+    await addPayee(agentPKP.ethAddress);
+    console.log('Added payee', agentPKP.ethAddress);
+  } catch (err) {
+    console.warn('Failed to add payee', err);
+  }
 
   return agentPKP;
 }

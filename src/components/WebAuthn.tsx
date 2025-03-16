@@ -41,9 +41,7 @@ export default function WebAuthn({
       try {
         const authInfo = {
           type: 'webauthn',
-          credentialId: 'webauthn-credential', // Default value since we can't get actual ID
           authenticatedAt: new Date().toISOString(),
-          authMethodType: 3
         };
         
         console.log('Storing basic WebAuthn information in localStorage:', authInfo);
@@ -62,11 +60,6 @@ export default function WebAuthn({
   if (loading) {
     return (
       <>
-        {error && (
-          <div className="alert alert--error">
-            <p>{error.message}</p>
-          </div>
-        )}
         <div className="loader-container">
           <div className="loader"></div>
           <p>Follow the prompts to continue...</p>
@@ -77,11 +70,6 @@ export default function WebAuthn({
 
   return (
     <>
-      {error && (
-        <div className="alert alert--error">
-          <p>{error.message}</p>
-        </div>
-      )}
       <div className="auth-options">
         {registerWithWebAuthn && (
           <div className="auth-option">
@@ -89,7 +77,7 @@ export default function WebAuthn({
             <p>Create a new passkey for passwordless authentication.</p>
             <button
               type="button"
-              className={`btn btn--outline ${loading && 'btn--loading'}`}
+              className={`btn btn--primary ${loading && 'btn--loading'}`}
               onClick={handleRegister}
               disabled={loading}
             >
@@ -103,7 +91,7 @@ export default function WebAuthn({
           <p>Use your existing passkey to sign in.</p>
           <button
             type="button"
-            className={`btn btn--outline ${loading && 'btn--loading'}`}
+            className={`btn btn--primary ${loading && 'btn--loading'}`}
             onClick={handleAuthenticate}
             disabled={loading}
           >
@@ -114,7 +102,8 @@ export default function WebAuthn({
       
       <button
         onClick={() => setView('default')}
-        className="btn btn--link"
+        className="btn btn--outline"
+        style={{ marginTop: '8px' }}
       >
         Back
       </button>
