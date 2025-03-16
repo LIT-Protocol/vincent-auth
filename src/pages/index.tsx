@@ -70,53 +70,6 @@ export default function IndexView() {
       try {
         const agentPkpInfo = await getAgentPKP(currentAccount.ethAddress);
         setAgentPKP(agentPkpInfo);
-
-        // Initialize the user PKP wallet
-        console.log('Generating new agent session signatures...');
-        console.log('Initializing user PKP wallet...');
-        const userPkpWallet = new PKPEthersWallet({
-          controllerSessionSigs: sigs,
-          pkpPubKey: currentAccount.publicKey,
-          litNodeClient: litNodeClient,
-        });
-        await userPkpWallet.init();
-        console.log('User PKP wallet initialized');
-        console.log('User PKP details:', currentAccount);
-        console.log('Agent PKP details:', agentPkpInfo);
-
-
-        // Authenticate with EthWalletProvider
-        console.log('Authenticating with EthWalletProvider...');
-        const authMethodForAgent = await EthWalletProvider.authenticate({
-          signer: userPkpWallet,
-          litNodeClient
-        });
-        console.log('Authentication method:', authMethodForAgent);
-
-        // Derive session signatures for the agent PKP
-
-        /*
-
-        console.log('Getting session signatures for Agent PKP...');
-        const agentPkpSessionSigs = await getSessionSigs({
-          pkpPublicKey: agentPkpInfo.publicKey,
-          authMethod: authMethodForAgent,
-        });
-        console.log('Agent PKP session sigs:', agentPkpSessionSigs);*/
-
-        const agentPkpWallet = new PKPEthersWallet({
-          controllerSessionSigs: sessionSigs,
-          pkpPubKey: agentPkpInfo.publicKey,
-          litNodeClient: litNodeClient,
-        });
-        await agentPkpWallet.init();
-
-        const agentAuthMethod = await EthWalletProvider.authenticate({
-          signer: agentPkpWallet,
-          litNodeClient
-        });
-        console.log('Agent PKP authentication method:', agentAuthMethod);
-
         setAgentSessionSigs(sigs);
       } catch (agentError) {
         console.error('Error handling Agent PKP:', agentError);
