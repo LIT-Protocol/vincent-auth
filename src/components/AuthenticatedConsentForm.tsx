@@ -10,7 +10,8 @@ import { litNodeClient } from '../utils/lit';
 import * as ethers from 'ethers';
 import { LIT_RPC } from '@lit-protocol/constants';
 import APP_FACET_ABI from '../utils/abis/VincentAppViewFacet.abi.json';
-import USER_FACET_ABI from '../utils/abis/VincentUserViewFacet.abi.json';
+import USER_VIEW_FACET_ABI from '../utils/abis/VincentUserViewFacet.abi.json';
+import USER_FACET_ABI from '../utils/abis/VincentUserFacet.abi.json';
 
 export interface ConsentFormData {
   delegatees: string[];
@@ -47,6 +48,7 @@ export default function AuthenticatedConsentForm({
   sessionSigs,
   agentPKP,
   isSessionValidation,
+  currentAccount,
 }: AuthenticatedConsentFormProps) {
   const router = useRouter();
   const { disconnectAsync } = useDisconnect();
@@ -62,6 +64,7 @@ export default function AuthenticatedConsentForm({
   const [generatedJwt, setGeneratedJwt] = useState<string | null>(null);
   const [isAppAlreadyPermitted, setIsAppAlreadyPermitted] = useState<boolean>(false);
   const [checkingPermissions, setCheckingPermissions] = useState<boolean>(true);
+  const [versionData, setVersionData] = useState<any>(null);
 
   // Get referrer URL from sessionStorage
   useEffect(() => {
@@ -71,9 +74,9 @@ export default function AuthenticatedConsentForm({
     }
   }, []);
   
-  // Check if app is already permitted for this PKP
+  // Check if app is already permitted for this PKP and fetch all app data
   useEffect(() => {
-    async function checkAppPermission() {
+    async function checkAppPermissionAndFetchData() {
       if (!appId || !agentPKP) {
         setCheckingPermissions(false);
         return;
@@ -81,16 +84,80 @@ export default function AuthenticatedConsentForm({
 
       try {
         const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
-        const userRegistryContract = new ethers.Contract(
+        const userViewRegistryContract = new ethers.Contract(
           process.env.NEXT_PUBLIC_VINCENT_DATIL_CONTRACT!,
-          USER_FACET_ABI,
+          USER_VIEW_FACET_ABI,
+          provider
+        );
+        const userRegistryContract = new ethers.Contract(
+          process.env.NEXT_PUBLIC_VINCENT_DATIL_CONTRACT!, 
+          USER_FACET_ABI, 
+          provider
+        );
+        const appRegistryContract = new ethers.Contract(
+          process.env.NEXT_PUBLIC_VINCENT_DATIL_CONTRACT!, 
+          APP_FACET_ABI, 
           provider
         );
 
         // Get all permitted app IDs for this PKP
-        const permittedAppIds = await userRegistryContract.getAllPermittedAppIdsForPkp(agentPKP.tokenId);
+        const permittedAppIds = await userViewRegistryContract.getAllPermittedAppIdsForPkp(agentPKP.tokenId);
         console.log('Permitted app IDs for this PKP:', permittedAppIds);
         console.log('Current app ID:', appId);
+
+        // Fetch app info and version data
+        const appInfo = await appRegistryContract.getAppById(Number(appId));
+        console.log('App info:', appInfo);
+        
+        // Set the app info state
+        setAppInfo(appInfo);
+        
+        // Initialize formData as soon as we have appInfo
+        setFormData({
+          delegatees: [],
+          agentPKP: agentPKP ? {
+            tokenId: agentPKP.tokenId,
+            publicKey: agentPKP.publicKey,
+            ethAddress: agentPKP.ethAddress
+          } : {
+            tokenId: '',
+            publicKey: '',
+            ethAddress: ''
+          },
+          roleId: router.query.roleId as string
+        });
+        
+        const versionNumber = Number(appInfo.latestVersion);
+        console.log('Latest version:', versionNumber);
+        
+        const versionData = await appRegistryContract.getAppVersion(appId, versionNumber);
+        console.log('Version data:', versionData);
+        
+        // Store the version data
+        setVersionData({
+          version: versionData.appVersion.version,
+          toolIpfsCidHashes: versionData.appVersion.toolIpfsCidHashes
+        });
+        
+        // Try to fetch tool data
+        console.log("Version data hashes", versionData.appVersion.toolIpfsCidHashes);
+        console.log("Agent PKP tokenId", agentPKP.tokenId);
+        console.log("App ID", appId);
+        console.log("App Info latestVersion", appInfo.latestVersion);
+        /*
+        for(const hash of versionData.appVersion.toolIpfsCidHashes || ['QmZ9mydsUQf3K7JvSDyZn7v9Fv5ZRzNrLMcuLCTdi4JE8h']) {
+          try {
+            const toolData = await userRegistryContract.getAllPoliciesWithParametersForTool(
+              agentPKP.tokenId, 
+              appId, 
+              Number(appInfo.latestVersion), 
+              hash
+            );
+            console.log('Tool data:', toolData);
+          } catch (toolError) {
+            console.error('Error fetching tool data:', toolError);
+          }
+        }*/
 
         // Check if the current app ID is in the permitted list
         const appIdNum = Number(appId);
@@ -112,13 +179,15 @@ export default function AuthenticatedConsentForm({
           }, 1500);
         }
       } catch (err) {
-        console.error('Error checking app permissions:', err);
+        console.error('Error checking app permissions or fetching app data:', err);
       } finally {
         setCheckingPermissions(false);
+        // Always set isLoading to false when permissions check completes
+        setIsLoading(false);
       }
     }
 
-    checkAppPermission();
+    checkAppPermissionAndFetchData();
   }, [appId, agentPKP, referrerUrl]);
   
   // Fetch app info from database
@@ -126,29 +195,18 @@ export default function AuthenticatedConsentForm({
     let mounted = true;
 
     async function fetchAppInfo() {
+      // Don't do anything if appId is missing, component is unmounted, or app is already permitted
       if (!appId || !mounted || isAppAlreadyPermitted) return;
+      
+      // Don't proceed if we're still checking permissions in the other effect
+      if (checkingPermissions) return;
 
       try {
-        const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
-        const registryContract = new ethers.Contract(process.env.NEXT_PUBLIC_VINCENT_DATIL_CONTRACT!, APP_FACET_ABI, provider);
-
-        // Log the appId being used (for debugging)
-        console.log('Fetching app info for appId:', appId);
-
-        // Get app info using getAppById which only takes appId
-        const appData = await registryContract.getAppById(Number(appId));
-        let pkp;
-        const storedAuthInfo = localStorage.getItem('lit-auth-info');
-        if (storedAuthInfo) {
-          const parsedAuthInfo = JSON.parse(storedAuthInfo);
-          pkp = parsedAuthInfo.pkp;
-          console.log('Retrieved auth info:', parsedAuthInfo);
-        }
-        console.log('✅ App info:', appData);
-        
-        if (mounted) {
-          setAppInfo(appData);
-          // Initialize formData with default values and add the agentPKP data if available
+        // Only initialize formData when we have appInfo
+        if (appInfo && !formData && mounted) {
+          console.log('Setting up form data based on retrieved app info');
+          
+          // Initialize formData with values from appInfo and agentPKP
           setFormData({
             delegatees: [],
             agentPKP: agentPKP ? {
@@ -162,10 +220,12 @@ export default function AuthenticatedConsentForm({
             },
             roleId: router.query.roleId as string
           });
+          
+          // Only set loading to false when we have both appInfo and formData
           setIsLoading(false);
         }
       } catch (err) {
-        console.error('Error fetching app info:', err);
+        console.error('Error in fetchAppInfo:', err);
         if (mounted) {
           setError('Failed to load app information');
           setIsLoading(false);
@@ -178,7 +238,7 @@ export default function AuthenticatedConsentForm({
     return () => {
       mounted = false;
     };
-  }, [appId, agentPKP, router.query.roleId, isAppAlreadyPermitted]);
+  }, [appId, agentPKP, router.query.roleId, isAppAlreadyPermitted, appInfo]);
 
   const handleLogout = useCallback(async () => {
     try {
@@ -192,19 +252,21 @@ export default function AuthenticatedConsentForm({
       } catch (storageError) {
         console.error('Error clearing auth info from localStorage:', storageError);
       }
+      
+      // Redirect to referrer URL if available
+      if (referrerUrl) {
+        window.location.href = referrerUrl;
+      }
     } catch (err) {
       console.error('Error during logout:', err);
     }
-  }, [disconnectAsync]);
+  }, [disconnectAsync, referrerUrl]);
 
   const handleDisapprove = useCallback(async () => {
     setShowDisapproval(true);
     
     // Wait for animation to complete before redirecting
     setTimeout(() => {
-      // First call the handleLogout callback
-      handleLogout();
-      
       // Then wait a moment before redirecting
       setTimeout(() => {
         // Redirect to the referrer URL without the JWT
@@ -214,6 +276,32 @@ export default function AuthenticatedConsentForm({
       }, 100); // Small delay to ensure callback completes
     }, 2000); // Animation display time
   }, [handleLogout, referrerUrl]);
+
+  const approveConsent = async () => {
+    const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
+    const userRegistryContract = new ethers.Contract(
+      process.env.NEXT_PUBLIC_VINCENT_DATIL_CONTRACT!, 
+      USER_FACET_ABI, 
+      provider
+    );
+    const userPkpWallet = new PKPEthersWallet({
+      controllerSessionSigs: sessionSigs,
+      pkpPubKey: currentAccount.publicKey,
+      litNodeClient: litNodeClient,
+    });
+    userRegistryContract.connect(userPkpWallet)
+
+    const txHash = await userRegistryContract.permitAppVersion(agentPKP!.tokenId, appId, Number(appInfo!.latestVersion), versionData.toolIpfsCidHashes, [[]], [[[]]], [[[]]], {
+      gasLimit: 1000000
+    })
+    console.log('Transaction hash:', txHash);
+    const tx = await provider.getTransaction(txHash);
+    console.log('Transaction:', tx);
+    const receipt = await tx.wait();
+    console.log('Receipt:', receipt);
+
+
+  }
   
   // Generate JWT for redirection
   const generateJWT = async (): Promise<string | null> => {
@@ -284,6 +372,7 @@ export default function AuthenticatedConsentForm({
     try {
       // Generate JWT - this is now the only place JWT generation happens in the app
       const jwt = await generateJWT();
+      await approveConsent();
 
       // Show success animation
       setShowSuccess(true);
@@ -337,22 +426,15 @@ export default function AuthenticatedConsentForm({
             This app is already authorized. Redirecting...
           </p>
         </div>
-        <style jsx>{`
-          .auto-redirect-message {
-            text-align: center;
-            margin-top: 20px;
-            font-size: 1.2rem;
-          }
-        `}</style>
       </div>
     );
   }
 
-  // Show loading indicator while checking permissions
-  if (checkingPermissions) {
+  // Show loading indicator while checking permissions or loading app info
+  if (checkingPermissions || isLoading) {
     return (
       <div className="consent-form-container">
-        <p>Checking app permissions...</p>
+        <p>Loading app information...</p>
       </div>
     );
   }
@@ -378,14 +460,7 @@ export default function AuthenticatedConsentForm({
     );
   }
 
-  if (isLoading) {
-    return (
-      <div className="consent-form-container">
-        <p>Loading app information...</p>
-      </div>
-    );
-  }
-
+  // Only show this error if we're not loading and the data is still missing
   if (!formData || !appInfo) {
     return (
       <div className="consent-form-container">
@@ -397,7 +472,7 @@ export default function AuthenticatedConsentForm({
   }
 
   return (
-    <div className="container">
+    <div className={isSessionValidation ? 'session-validator-consent' : 'container'}>
       <div className="consent-form-container">
         {showSuccess && (
           <div className="animation-overlay">
@@ -418,14 +493,7 @@ export default function AuthenticatedConsentForm({
           </div>
         )}
 
-        <div className="logout-container">
-          <button className="btn btn--link" onClick={handleLogout}>
-            Logout
-          </button>
-        </div>
-        
         <h1>Agent Consent Notice</h1>
-        
         {error && (
           <div className="alert alert--error">
             <p>{error}</p>
@@ -440,6 +508,17 @@ export default function AuthenticatedConsentForm({
               <p><strong>Description:</strong> {appInfo.description}</p>
               {agentPKP && (
                 <p><strong>PKP Address:</strong> {agentPKP.ethAddress}</p>
+              )}
+              {versionData && (
+                <>
+                  <p><strong>Version:</strong> {versionData.version ? versionData.version.toString() : '1'}</p>
+                  <div className="tool-hash-info">
+                    <p><strong>Tool IPFS Hash:</strong></p>
+                    <p className="tool-hash">
+                      {versionData.toolIpfsCidHashes}
+                    </p>
+                  </div>
+                </>
               )}
             </div>
             
@@ -462,41 +541,6 @@ export default function AuthenticatedConsentForm({
           </div>
         )}
       </div>
-      <style jsx>{`
-        .session-validator-consent {
-          position: fixed;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          z-index: 9999;
-          background-color: white;
-          display: flex;
-          flex-direction: column;
-          align-items: center;
-          justify-content: flex-start;
-          padding-top: 2rem;
-          overflow-y: auto;
-          width: 100vw;
-          height: 100vh;
-          max-width: 100%;
-          max-height: 100%;
-          box-sizing: border-box;
-          margin: 0;
-          padding: 20px;
-        }
-        
-        /* When shown from session validator, add extra spacing and styling */
-        .session-validator-consent .consent-form-container {
-          width: 100%;
-          max-width: 800px;
-          margin: 0 auto;
-          padding: 20px;
-          background-color: #fff;
-          border-radius: 8px;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-      `}</style>
     </div>
   );
 } 

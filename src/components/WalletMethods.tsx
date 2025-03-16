@@ -50,7 +50,11 @@ const WalletMethods = ({ authWithEthWallet, setView }: WalletMethodsProps) => {
             <span className="btn__label">Continue with {connector.name}</span>
           </button>
         ))}
-        <button onClick={() => setView('default')} className="btn btn--link">
+        <button 
+          onClick={() => setView('default')} 
+          className="btn btn--outline"
+          style={{ marginTop: '8px' }}
+        >
           Back
         </button>
       </div>

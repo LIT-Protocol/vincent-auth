@@ -27,11 +27,6 @@ export default function LoginMethods({
   return (
     <div className="container">
       <div className="wrapper">
-        {error && (
-          <div className="alert alert--error">
-            <p>{error.message}</p>
-          </div>
-        )}
         {view === 'default' && (
           <>
             <h1>Lit Agent Wallet Management</h1>

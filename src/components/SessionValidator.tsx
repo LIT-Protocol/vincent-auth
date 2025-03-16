@@ -15,8 +15,6 @@ import { useRouter } from 'next/router';
 interface AuthInfo {
   type: string;
   authenticatedAt: string;
-  credentialId?: string;
-  authMethodType?: number;
   pkp?: IRelayPKP;
   value?: string;
 }
@@ -189,7 +187,6 @@ const SessionValidator: React.FC = () => {
     switch (authInfo.type) {
       case 'webauthn':
         methodName = 'WebAuthn Passkey';
-        methodDetails = authInfo.credentialId ? `Credential ID: ${authInfo.credentialId.substring(0, 8)}...` : '';
         break;
       case 'email':
         methodName = 'Email OTP';
@@ -216,9 +213,6 @@ const SessionValidator: React.FC = () => {
         <p><strong>{methodName}</strong></p>
         {methodDetails && <p>{methodDetails}</p>}
         <p className="auth-time">Authenticated at: {authTime}</p>
-        {authInfo.authMethodType !== undefined && (
-          <p className="auth-method-type">Auth Method Type: {authInfo.authMethodType}</p>
-        )}
         <div className="pkp-key">
           <p><strong>Account Ethereum Address:</strong></p>
           <p className="pkp-key-value">{pkpEthAddress}</p>
@@ -232,96 +226,14 @@ const SessionValidator: React.FC = () => {
     return (
       <div className="consent-form-overlay">
         <div className="consent-form-modal">
-          <button 
-            className="close-button"
-            onClick={() => setShowConsentForm(false)}
-            aria-label="Close"
-          >
-            ✕
-          </button>
           <AuthenticatedConsentForm 
             currentAccount={authInfo.pkp}
             sessionSigs={sessionSigs}
             agentPKP={authInfo.pkp}
             agentSessionSigs={sessionSigs}
-            isSessionValidation={true}
+            isSessionValidation={false}
           />
         </div>
-        <style jsx>{`
-          .consent-form-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 9999;
-            background-color: rgba(0, 0, 0, 0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-          }
-          .consent-form-modal {
-            background-color: white;
-            border-radius: 8px;
-            border: 1px solid #e5e7eb;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-            max-width: 48rem;
-            max-height: calc(100vh - 2rem);
-            overflow-y: auto;
-            width: 100%;
-            padding: 1.5rem;
-            position: relative;
-          }
-          .close-button {
-            position: absolute;
-            top: 10px;
-            right: 10px;
-            background: none;
-            border: none;
-            font-size: 20px;
-            cursor: pointer;
-            color: #666;
-            z-index: 1;
-          }
-          .close-button:hover {
-            color: #000;
-          }
-          .auth-info {
-            margin: 20px 0;
-            padding: 12px;
-            background-color: #f3f4f6;
-            border-radius: 6px;
-            text-align: left;
-          }
-          .auth-info h4 {
-            margin-top: 0;
-            color: #4b5563;
-          }
-          .auth-time {
-            font-size: 0.85rem;
-            color: #6b7280;
-            margin-top: 8px;
-          }
-          .auth-method-type {
-            font-size: 0.85rem;
-            color: #6b7280;
-            margin-top: 4px;
-          }
-          .pkp-key {
-            margin-top: 12px;
-            border-top: 1px solid #e5e7eb;
-            padding-top: 12px;
-          }
-          .pkp-key-value {
-            font-family: monospace;
-            font-size: 0.8rem;
-            word-break: break-all;
-            background-color: #e5e7eb;
-            padding: 8px;
-            border-radius: 4px;
-            overflow-wrap: break-word;
-          }
-        `}</style>
       </div>
     );
   }
@@ -338,7 +250,7 @@ const SessionValidator: React.FC = () => {
             {renderAuthMethodInfo()}
             
             <div className="session-popup-buttons">
-              <button onClick={handleUseExistingAccount} className="btn">
+              <button onClick={handleUseExistingAccount} className="btn btn--primary">
                 Yes, Use Existing Account
               </button>
               <button onClick={handleSignOut} className="btn btn--outline">
@@ -346,95 +258,6 @@ const SessionValidator: React.FC = () => {
               </button>
             </div>
           </div>
-          <style jsx>{`
-            .session-popup-overlay {
-              position: fixed;
-              top: 0;
-              left: 0;
-              right: 0;
-              bottom: 0;
-              background-color: rgba(0, 0, 0, 0.5);
-              display: flex;
-              justify-content: center;
-              align-items: center;
-              z-index: 1000;
-            }
-            .session-popup {
-              background-color: white;
-              padding: 24px;
-              border-radius: 8px;
-              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-              max-width: 480px;
-              width: 100%;
-              text-align: center;
-            }
-            .session-popup h3 {
-              margin-top: 0;
-              font-size: 20px;
-            }
-            .auth-info {
-              margin: 20px 0;
-              padding: 12px;
-              background-color: #f3f4f6;
-              border-radius: 6px;
-              text-align: left;
-            }
-            .auth-info h4 {
-              margin-top: 0;
-              color: #4b5563;
-            }
-            .auth-time {
-              font-size: 0.85rem;
-              color: #6b7280;
-              margin-top: 8px;
-            }
-            .auth-method-type {
-              font-size: 0.85rem;
-              color: #6b7280;
-              margin-top: 4px;
-            }
-            .pkp-key {
-              margin-top: 12px;
-              border-top: 1px solid #e5e7eb;
-              padding-top: 12px;
-            }
-            .pkp-key-value {
-              font-family: monospace;
-              font-size: 0.8rem;
-              word-break: break-all;
-              background-color: #e5e7eb;
-              padding: 8px;
-              border-radius: 4px;
-              overflow-wrap: break-word;
-            }
-            .session-popup-buttons {
-              display: flex;
-              justify-content: center;
-              gap: 12px;
-              margin-top: 20px;
-            }
-            .btn {
-              padding: 10px 16px;
-              border-radius: 4px;
-              font-weight: 500;
-              cursor: pointer;
-              border: none;
-              transition: all 0.2s;
-              background-color: #000;
-              color: white;
-            }
-            .btn:hover {
-              background-color: #333;
-            }
-            .btn--outline {
-              background-color: transparent;
-              border: 1px solid #000;
-              color: #000;
-            }
-            .btn--outline:hover {
-              background-color: rgba(0, 0, 0, 0.05);
-            }
-          `}</style>
         </div>
       )}
     </>
