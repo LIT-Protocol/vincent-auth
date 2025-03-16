@@ -70,68 +70,7 @@ export default function IndexView() {
       try {
         const agentPkpInfo = await getAgentPKP(currentAccount.ethAddress);
         setAgentPKP(agentPkpInfo);
-
-        // Initialize the user PKP wallet
-        console.log('Generating new agent session signatures...');
-        console.log('Initializing user PKP wallet...');
-        const userPkpWallet = new PKPEthersWallet({
-          controllerSessionSigs: sigs,
-          pkpPubKey: currentAccount.publicKey,
-          litNodeClient: litNodeClient,
-        });
-        await userPkpWallet.init();
-        console.log('User PKP wallet initialized');
-        console.log('User PKP details:', currentAccount);
-        console.log('Agent PKP details:', agentPkpInfo);
-
-
-        // Authenticate with EthWalletProvider
-        console.log('Authenticating with EthWalletProvider...');
-        const authMethodForAgent = await EthWalletProvider.authenticate({
-          signer: userPkpWallet,
-          litNodeClient
-        });
-        console.log('Authentication method:', authMethodForAgent);
-
-        // Derive session signatures for the agent PKP
-
-        /*
-
-        console.log('Getting session signatures for Agent PKP...');
-        const agentPkpSessionSigs = await getSessionSigs({
-          pkpPublicKey: agentPkpInfo.publicKey,
-          authMethod: authMethodForAgent,
-        });
-        console.log('Agent PKP session sigs:', agentPkpSessionSigs);*/
-
-        const agentPkpWallet = new PKPEthersWallet({
-          controllerSessionSigs: sessionSigs,
-          pkpPubKey: agentPkpInfo.publicKey,
-          litNodeClient: litNodeClient,
-        });
-        await agentPkpWallet.init();
-
-        const agentAuthMethod = await EthWalletProvider.authenticate({
-          signer: agentPkpWallet,
-          litNodeClient
-        });
-        console.log('Agent PKP authentication method:', agentAuthMethod);
-
-        if (referrerUrl) {
-          try {
-            // Removed JWT generation code since it will happen in AuthenticatedConsentForm
-            // after user gives explicit consent
-
-            // Contract calls have been moved to the AuthenticatedConsentForm component
-            console.log('Referrer URL found, contract calls will be handled in AuthenticatedConsentForm');
-          } catch (error) {
-            console.error('Error:', error);
-          }
-        } else {
-          console.log('No referrer URL found, skipping app data lookup');
-        }
-
-        setAgentSessionSigs(sessionSigs);
+        setAgentSessionSigs(sigs);
       } catch (agentError) {
         console.error('Error handling Agent PKP:', agentError);
         // Don't set session error - we can still proceed with just the user PKP
@@ -220,7 +159,7 @@ export default function IndexView() {
         const authInfo = JSON.parse(storedAuthInfo);
 
         // Add PKP info to the existing auth info
-        authInfo.pkp = currentAccount;
+        authInfo.pkp = agentPKP;
         localStorage.setItem('lit-auth-info', JSON.stringify(authInfo));
         console.log('Updated auth info with PKP public keys:', authInfo);
       }

@@ -257,6 +257,7 @@ export async function getSessionSigs({
  * Disconnects web3 session after use
  */
 export async function cleanupSession(): Promise<void> {
+  localStorage.removeItem('lit-auth-info');
   await disconnectWeb3();
 }
 
