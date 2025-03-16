@@ -1,17 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { litNodeClient } from '@/utils/lit';
 import { LitActionResource } from '@lit-protocol/auth-helpers';
 import { LitPKPResource } from '@lit-protocol/auth-helpers';
 import { LIT_ABILITY } from '@lit-protocol/constants';
 import { validateSessionSigs } from '@lit-protocol/misc';
-import { LIT_NETWORKS_KEYS } from '@lit-protocol/types';
 import { disconnectWeb3 } from '@lit-protocol/auth-browser';
-import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { SessionSigs, IRelayPKP } from '@lit-protocol/types';
-import { ethers } from 'ethers';
+import * as ethers from 'ethers';
+
+import { cleanupSession, litNodeClient } from '@/utils/lit';
 import AuthenticatedConsentForm from './AuthenticatedConsentForm';
-import { useRouter } from 'next/router';
-import { getPkpNftContract } from '@/utils/get-pkp-nft-contract';
+
 
 // Define interfaces for the authentication info
 interface AuthInfo {
@@ -26,33 +24,26 @@ interface AuthInfo {
  * A streamlined SessionValidator component that validates session signatures on mount
  */
 const SessionValidator: React.FC = () => {
-  const router = useRouter();
   const [showConsentForm, setShowConsentForm] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [sessionSigs, setSessionSigs] = useState<SessionSigs | null>(null);
   const [authInfo, setAuthInfo] = useState<AuthInfo | null>(null);
-  const [referrerUrl, setReferrerUrl] = useState<string | null>(null);
   const [hasCheckedSession, setHasCheckedSession] = useState(false);
 
   // Check for auth info on mount
   useEffect(() => {
-    // Try to get stored referrer URL from sessionStorage
-    const storedReferrer = sessionStorage.getItem('referrerUrl');
-    if (storedReferrer) {
-      setReferrerUrl(storedReferrer);
-    }
-    
-    // Get auth info from localStorage
     try {
       const storedAuthInfo = localStorage.getItem('lit-auth-info');
       if (storedAuthInfo) {
         const parsedAuthInfo = JSON.parse(storedAuthInfo);
         setAuthInfo(parsedAuthInfo);
         console.log('Retrieved auth info:', parsedAuthInfo);
-        
+
         // If we have auth info with a PKP, show the popup
         if (parsedAuthInfo.agentPKP) {
-          console.log('Found existing PKP in auth info, will check session validity');
+          console.log(
+            'Found existing PKP in auth info, will check session validity'
+          );
         }
       }
     } catch (error) {
@@ -64,7 +55,7 @@ const SessionValidator: React.FC = () => {
   useEffect(() => {
     // Skip if we've already checked the session or don't have auth info
     if (hasCheckedSession || !authInfo || !authInfo.agentPKP) return;
-    
+
     const validateSession = async () => {
       try {
         // Try to get a wallet signature using the session capability object
@@ -72,27 +63,32 @@ const SessionValidator: React.FC = () => {
           // Check if lit-wallet-sig exists in localStorage first
           const litWalletSig = localStorage.getItem('lit-wallet-sig');
           if (!litWalletSig) {
-            console.log('Storage key "lit-wallet-sig" is missing. Skipping session validation.');
+            console.log(
+              'Storage key "lit-wallet-sig" is missing. Skipping session validation.'
+            );
             setHasCheckedSession(true);
             return; // Exit early if the key is missing
           }
-          
+
           console.log('Generating wallet signature...');
           // Create lit resources for action execution and PKP signing
           const litResources = [
-            new LitActionResource("*"),
-            new LitPKPResource("*")
+            new LitActionResource('*'),
+            new LitPKPResource('*'),
           ];
-          
+
           // Generate session key
           const sessionKey = await litNodeClient.getSessionKey();
-          
+
           // Generate session capability object with wildcards
-          const sessionCapabilityObject = await litNodeClient.generateSessionCapabilityObjectWithWildcards(litResources);
+          const sessionCapabilityObject =
+            await litNodeClient.generateSessionCapabilityObjectWithWildcards(
+              litResources
+            );
 
           // Get wallet signature
           const walletSig = await litNodeClient.getWalletSig({
-            chain: "ethereum",
+            chain: 'ethereum',
             expiration: new Date(Date.now() + 1000 * 60 * 15).toISOString(),
             sessionKey,
             sessionKeyUri: `lit:session:${sessionKey.publicKey}`,
@@ -104,14 +100,16 @@ const SessionValidator: React.FC = () => {
             setHasCheckedSession(true);
             return;
           }
-          
+
           if (walletSig) {
-            const ethersWallet = new ethers.Wallet("0x867266a73bfc47cf6d739d9732824441f060f042ea912f0043a87d28077193d2");
+            const ethersWallet = new ethers.Wallet(
+              '0x867266a73bfc47cf6d739d9732824441f060f042ea912f0043a87d28077193d2'
+            );
             const { capacityDelegationAuthSig } =
-            await litNodeClient.createCapacityDelegationAuthSig({
-              dAppOwnerWallet: ethersWallet,
-              capacityTokenId: "142580",
-            });
+              await litNodeClient.createCapacityDelegationAuthSig({
+                dAppOwnerWallet: ethersWallet,
+                capacityTokenId: '142580',
+              });
 
             const attemptedSessionSigs = await litNodeClient.getSessionSigs({
               capabilityAuthSigs: [walletSig, capacityDelegationAuthSig],
@@ -127,18 +125,22 @@ const SessionValidator: React.FC = () => {
               ],
               authNeededCallback: () => {
                 return Promise.resolve(walletSig);
-              }
+              },
             });
-            
+
             // Store session sigs in state for later use
             setSessionSigs(attemptedSessionSigs);
-            
-            const validationResult = await validateSessionSigs(attemptedSessionSigs);
+
+            const validationResult = await validateSessionSigs(
+              attemptedSessionSigs
+            );
             console.log('Validation result:', validationResult.isValid);
-            
+
             // If validation is successful, show options (change from showing popup to showing consent form)
             if (validationResult.isValid) {
-              console.log('Session is valid, showing popup to use existing account');
+              console.log(
+                'Session is valid, showing popup to use existing account'
+              );
               setShowPopup(true);
             }
           }
@@ -151,10 +153,10 @@ const SessionValidator: React.FC = () => {
         setHasCheckedSession(true);
       }
     };
-    
+
     validateSession();
   }, [authInfo, hasCheckedSession]);
-  
+
   // Handle user's choice to use existing account
   const handleUseExistingAccount = async () => {
     if (sessionSigs && authInfo?.agentPKP) {
@@ -165,18 +167,10 @@ const SessionValidator: React.FC = () => {
       setShowPopup(false);
     }
   };
-  
+
   // Handle user's choice to sign out
   const handleSignOut = async () => {
-    // Clear auth info from localStorage
-    try {
-      localStorage.removeItem('lit-auth-info');
-      console.log('Cleared authentication information from localStorage');
-    } catch (error) {
-      console.error('Error clearing auth info from localStorage:', error);
-    }
-    
-    await disconnectWeb3()
+    cleanupSession();
     setShowPopup(false);
   };
 
@@ -203,33 +197,42 @@ const SessionValidator: React.FC = () => {
         methodName = authInfo.type;
     }
 
-    const authTime = authInfo.authenticatedAt 
-      ? new Date(authInfo.authenticatedAt).toLocaleString() 
+    const authTime = authInfo.authenticatedAt
+      ? new Date(authInfo.authenticatedAt).toLocaleString()
       : 'Unknown time';
 
     // Get PKP Ethereum address for display
     const pkpEthAddress = authInfo.agentPKP?.ethAddress || 'Not available';
 
     return (
-      <div className="auth-info">
+      <div className='auth-info'>
         <h4>Authentication Method</h4>
-        <p><strong>{methodName}</strong></p>
+        <p>
+          <strong>{methodName}</strong>
+        </p>
         {methodDetails && <p>{methodDetails}</p>}
-        <p className="auth-time">Authenticated at: {authTime}</p>
-        <div className="pkp-key">
-          <p><strong>Account Ethereum Address:</strong></p>
-          <p className="pkp-key-value">{pkpEthAddress}</p>
+        <p className='auth-time'>Authenticated at: {authTime}</p>
+        <div className='pkp-key'>
+          <p>
+            <strong>Account Ethereum Address:</strong>
+          </p>
+          <p className='pkp-key-value'>{pkpEthAddress}</p>
         </div>
       </div>
     );
   };
-  
+
   // If showing consent form, render only that
-  if (showConsentForm && sessionSigs && authInfo?.agentPKP && authInfo?.userPKP) {
+  if (
+    showConsentForm &&
+    sessionSigs &&
+    authInfo?.agentPKP &&
+    authInfo?.userPKP
+  ) {
     return (
-      <div className="consent-form-overlay">
-        <div className="consent-form-modal">
-          <AuthenticatedConsentForm 
+      <div className='consent-form-overlay'>
+        <div className='consent-form-modal'>
+          <AuthenticatedConsentForm
             userPKP={authInfo.userPKP}
             agentPKP={authInfo.agentPKP}
             sessionSigs={sessionSigs}
@@ -239,23 +242,29 @@ const SessionValidator: React.FC = () => {
       </div>
     );
   }
-  
+
   // If not showing consent form, render popup or nothing
   return (
     <>
       {showPopup && (
-        <div className="session-popup-overlay">
-          <div className="session-popup">
+        <div className='session-popup-overlay'>
+          <div className='session-popup'>
             <h3>Use Existing Account?</h3>
-            <p>Would you like to use your existing authentication for this session?</p>
-            
+            <p>
+              Would you like to use your existing authentication for this
+              session?
+            </p>
+
             {renderAuthMethodInfo()}
-            
-            <div className="session-popup-buttons">
-              <button onClick={handleUseExistingAccount} className="btn btn--primary">
+
+            <div className='session-popup-buttons'>
+              <button
+                onClick={handleUseExistingAccount}
+                className='btn btn--primary'
+              >
                 Yes, Use Existing Account
               </button>
-              <button onClick={handleSignOut} className="btn btn--outline">
+              <button onClick={handleSignOut} className='btn btn--outline'>
                 No, Sign Out
               </button>
             </div>
@@ -266,4 +275,4 @@ const SessionValidator: React.FC = () => {
   );
 };
 
-export default SessionValidator; 
+export default SessionValidator;
