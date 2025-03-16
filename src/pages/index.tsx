@@ -3,8 +3,8 @@ import { useRouter } from 'next/router';
 import useAuthenticate from '../hooks/useAuthenticate';
 import useAccounts from '../hooks/useAccounts';
 import { registerWebAuthn, getSessionSigs, cleanupSession, SELECTED_LIT_NETWORK, litNodeClient } from '../utils/lit';
-import { AUTH_METHOD_TYPE } from '@lit-protocol/constants';
-import Dashboard from '../components/Dashboard';
+import { AUTH_METHOD_TYPE, LIT_RPC } from '@lit-protocol/constants';
+import AuthenticatedConsentForm from '../components/AuthenticatedConsentForm';
 import Loading from '../components/Loading';
 import LoginMethods from '../components/LoginMethods';
 import { SessionSigs, IRelayPKP } from '@lit-protocol/types';
@@ -12,9 +12,14 @@ import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { EthWalletProvider } from '@lit-protocol/lit-auth-client';
 import { getAgentPKP } from '../utils/getAgentPKP';
 import { VincentSDK } from '@lit-protocol/vincent-sdk';
+import USER_FACET_ABI from '../utils/abis/VincentUserViewFacet.abi.json';
+import APP_VIEW_FACET_ABI from '../utils/abis/VincentAppViewFacet.abi.json';
+import * as ethers from 'ethers';
+import { useUrlAppId } from '@/hooks/useUrlAppId';
 
 export default function IndexView() {
   const router = useRouter();
+  const { appId, version, error: urlError } = useUrlAppId();
   const { managementWallet, roleId } = router.query;
   const [sessionSigs, setSessionSigs] = useState<SessionSigs>();
   const [agentSessionSigs, setAgentSessionSigs] = useState<SessionSigs>();
@@ -118,32 +123,29 @@ export default function IndexView() {
 
         const vincent = new VincentSDK()
 
-        if (!referrerUrl) {
-          throw new Error('Referrer URL is not set');
-        }
-        
-        const jwt = await vincent.createSignedJWT({
-          pkpWallet: agentPkpWallet,
-          pkp: agentPkpInfo,
-          payload: { name: "User Name", customClaim: "value" },
-          expiresInMinutes: 30,
-          audience: referrerUrl
-      });
-
-        if (!jwt) {
-          throw new Error('Failed to create JWT');
-        }
-        console.log('JWT created:', jwt);
-
-        const verifyJwt = await vincent.verifyJWT(referrerUrl);
-        if (!verifyJwt) {
-          throw new Error('Failed to verify JWT');
-        }
-        console.log('JWT verified:', verifyJwt);
-        
-        // Redirect user after successful JWT generation and verification with JWT as query param
         if (referrerUrl) {
-          window.location.href = `${referrerUrl}?jwt=${jwt}`;
+          try {
+            // Removed JWT generation code since it will happen in AuthenticatedConsentForm
+            // after user gives explicit consent
+            
+            const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
+            const userRegistryContract = new ethers.Contract(process.env.NEXT_PUBLIC_VINCENT_DATIL_CONTRACT!, USER_FACET_ABI, provider);
+            const appRegistryContract = new ethers.Contract(process.env.NEXT_PUBLIC_VINCENT_DATIL_CONTRACT!, APP_VIEW_FACET_ABI, provider);
+            // Get app info using getAppById which only takes appId
+            const appData = await userRegistryContract.getAllPermittedAppIdsForPkp(agentPkpInfo.tokenId);
+
+            console.log('App data:', appData);
+
+            console.log('App ID:', appId);
+            const appInfo = await appRegistryContract.getAppById(Number(appId));
+            console.log('App info:', appInfo);
+            //const versionData = await appRegistryContract.getAppVersion(appId, "1");
+            //console.log('Version data:', versionData);
+          } catch (error) {
+            console.error('Error fetching app data:', error);
+          }
+        } else {
+          console.log('No referrer URL found, skipping app data lookup');
         }
         
         setAgentSessionSigs(agentPkpSessionSigs);
@@ -244,12 +246,42 @@ export default function IndexView() {
     }
     
     return (
-      <Dashboard 
-        currentAccount={currentAccount} 
-        sessionSigs={sessionSigs}
-        agentPKP={agentPKP}
-        agentSessionSigs={agentSessionSigs}
-      />
+      <div className="consent-form-overlay">
+        <div className="consent-form-modal">
+          <AuthenticatedConsentForm 
+            currentAccount={currentAccount} 
+            sessionSigs={sessionSigs}
+            agentPKP={agentPKP}
+            agentSessionSigs={agentSessionSigs}
+          />
+        </div>
+        <style jsx>{`
+          .consent-form-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 9999;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+          }
+          .consent-form-modal {
+            background-color: white;
+            border-radius: 8px;
+            border: 1px solid #e5e7eb;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            max-width: 48rem;
+            max-height: calc(100vh - 2rem);
+            overflow-y: auto;
+            width: 100%;
+            padding: 1.5rem;
+            position: relative;
+          }
+        `}</style>
+      </div>
     );
   }
 
