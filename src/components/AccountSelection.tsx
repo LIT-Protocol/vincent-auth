@@ -5,13 +5,13 @@ import { useState } from 'react';
 
 interface AccountSelectionProp {
   accounts: IRelayPKP[];
-  setCurrentAccount: any;
+  setUserPKP: any;
   error?: Error;
 }
 
 export default function AccountSelection({
   accounts,
-  setCurrentAccount,
+  setUserPKP,
   error,
 }: AccountSelectionProp) {
   const [selectedValue, setSelectedValue] = useState<string>('0');
@@ -19,7 +19,7 @@ export default function AccountSelection({
   async function handleSubmit(event: any) {
     event.preventDefault();
     const account = accounts[parseInt(selectedValue)];
-    return setCurrentAccount(account);
+    return setUserPKP(account);
   }
 
   return (

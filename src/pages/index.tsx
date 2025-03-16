@@ -32,8 +32,8 @@ export default function IndexView() {
   } = useAuthenticate();
   const {
     fetchAccounts,
-    setCurrentAccount,
-    currentAccount,
+    setuserPKP,
+    userPKP,
     accounts,
     loading: accountsLoading,
     error: accountsError,
@@ -54,21 +54,21 @@ export default function IndexView() {
 
   // Function to generate session signatures on-demand
   async function generateSessionSigs() {
-    if (!authMethod || !currentAccount) return;
+    if (!authMethod || !userPKP) return;
 
     setSessionLoading(true);
     setSessionError(undefined);
     try {
       // Generate session signatures for the user PKP
       const sigs = await getSessionSigs({
-        pkpPublicKey: currentAccount.publicKey,
+        pkpPublicKey: userPKP.publicKey,
         authMethod
       });
       setSessionSigs(sigs);
 
       // After getting user PKP session sigs, try to get the agent PKP
       try {
-        const agentPkpInfo = await getAgentPKP(currentAccount.ethAddress);
+        const agentPkpInfo = await getAgentPKP(userPKP.ethAddress);
         setAgentPKP(agentPkpInfo);
         setAgentSessionSigs(sigs);
       } catch (agentError) {
@@ -85,7 +85,7 @@ export default function IndexView() {
   async function handleRegisterWithWebAuthn() {
     const newPKP = await registerWebAuthn();
     if (newPKP) {
-      setCurrentAccount(newPKP);
+      setuserPKP(newPKP);
     }
   }
 
@@ -117,17 +117,17 @@ export default function IndexView() {
 
   useEffect(() => {
     // If user is authenticated and has accounts, select the first one
-    if (authMethod && accounts.length > 0 && !currentAccount) {
-      setCurrentAccount(accounts[0]);
+    if (authMethod && accounts.length > 0 && !userPKP) {
+      setuserPKP(accounts[0]);
     }
-  }, [authMethod, accounts, currentAccount, setCurrentAccount]);
+  }, [authMethod, accounts, userPKP, setuserPKP]);
 
   useEffect(() => {
     // If user is authenticated and has selected an account, generate session sigs
-    if (authMethod && currentAccount) {
+    if (authMethod && userPKP) {
       generateSessionSigs();
     }
-  }, [authMethod, currentAccount]);
+  }, [authMethod, userPKP]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -151,7 +151,7 @@ export default function IndexView() {
   }
 
   // Authenticated states
-  if (currentAccount && sessionSigs) {
+  if (userPKP && sessionSigs) {
     // Save the PKP info in localStorage for SessionValidator to use
     try {
       const storedAuthInfo = localStorage.getItem('lit-auth-info');
@@ -159,7 +159,8 @@ export default function IndexView() {
         const authInfo = JSON.parse(storedAuthInfo);
 
         // Add PKP info to the existing auth info
-        authInfo.pkp = agentPKP;
+        authInfo.agentPKP = agentPKP;
+        authInfo.userPKP = userPKP;
         localStorage.setItem('lit-auth-info', JSON.stringify(authInfo));
         console.log('Updated auth info with PKP public keys:', authInfo);
       }
@@ -171,10 +172,9 @@ export default function IndexView() {
       <div className="consent-form-overlay">
         <div className="consent-form-modal">
           <AuthenticatedConsentForm
-            currentAccount={currentAccount}
+            userPKP={userPKP}
             sessionSigs={sessionSigs}
             agentPKP={agentPKP}
-            agentSessionSigs={agentSessionSigs}
           />
         </div>
       </div>

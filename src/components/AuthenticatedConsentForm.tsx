@@ -8,14 +8,12 @@ import { VincentSDK } from '@lit-protocol/vincent-sdk';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { litNodeClient } from '../utils/lit';
 import * as ethers from 'ethers';
-import { LIT_RPC } from '@lit-protocol/constants';
 import { getAppRegistryContract, getUserViewRegistryContract, getUserRegistryContract } from '../utils/contracts';
 
 interface AuthenticatedConsentFormProps {
-  currentAccount: IRelayPKP;
+  userPKP: IRelayPKP;
   sessionSigs: SessionSigs;
   agentPKP?: IRelayPKP;
-  agentSessionSigs?: SessionSigs;
   isSessionValidation?: boolean;
 }
 
@@ -33,7 +31,7 @@ export default function AuthenticatedConsentForm({
   sessionSigs,
   agentPKP,
   isSessionValidation,
-  currentAccount,
+  userPKP,
 }: AuthenticatedConsentFormProps) {
   const router = useRouter();
   const { disconnectAsync } = useDisconnect();
@@ -182,15 +180,6 @@ export default function AuthenticatedConsentForm({
     try {
       await disconnectAsync();
       await cleanupSession();
-      
-      // Clear stored auth info from localStorage
-      try {
-        localStorage.removeItem('lit-auth-info');
-        console.log('Cleared authentication information from localStorage');
-      } catch (storageError) {
-        console.error('Error clearing auth info from localStorage:', storageError);
-      }
-      
       // Redirect to referrer URL if available
       if (referrerUrl) {
         window.location.href = referrerUrl;
@@ -216,18 +205,7 @@ export default function AuthenticatedConsentForm({
   }, [handleLogout, referrerUrl]);
 
   const approveConsent = async () => {
-    // Add more detailed debugging
-    console.log('approveConsent called with versionData:', versionData);
-    console.log('versionData type:', typeof versionData);
-    console.log('versionData keys:', versionData ? Object.keys(versionData) : 'null');
-    
-    // Check if required data is available
-    if (!versionData || !versionData.toolIpfsCidHashes) {
-      console.error('Missing version data or tool IPFS CID hashes');
-      throw new Error('Missing version data or tool IPFS CID hashes');
-    }
-
-    if (!agentPKP || !appId || !appInfo) {
+    if (!agentPKP || !appId || !appInfo || !versionData) {
       console.error('Missing required data for consent approval');
       throw new Error('Missing required data for consent approval');
     }
@@ -235,7 +213,7 @@ export default function AuthenticatedConsentForm({
     const userRegistryContract = getUserRegistryContract();
     const userPkpWallet = new PKPEthersWallet({
       controllerSessionSigs: sessionSigs,
-      pkpPubKey: currentAccount.publicKey,
+      pkpPubKey: userPKP.publicKey,
       litNodeClient: litNodeClient,
     });
     await userPkpWallet.init();
@@ -256,7 +234,7 @@ export default function AuthenticatedConsentForm({
         gasLimit: 1000000
       }
     );
-    // Wait for the transaction to be mined
+
     const receipt = await txResponse.wait();
     console.log('Transaction receipt:', receipt);
     

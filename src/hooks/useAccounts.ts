@@ -5,7 +5,7 @@ import { IRelayPKP } from '@lit-protocol/types';
 
 export default function useAccounts() {
   const [accounts, setAccounts] = useState<IRelayPKP[]>([]);
-  const [currentAccount, setCurrentAccount] = useState<IRelayPKP>();
+  const [userPKP, setuserPKP] = useState<IRelayPKP>();
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<Error>();
 
@@ -23,7 +23,7 @@ export default function useAccounts() {
         setAccounts(myPKPs);
         // If only one PKP, set as current account
         if (myPKPs.length === 1) {
-          setCurrentAccount(myPKPs[0]);
+          setuserPKP(myPKPs[0]);
         }
       } catch (err) {
         setError(err as Error);
@@ -46,7 +46,7 @@ export default function useAccounts() {
 
         // console.log('createAccount pkp: ', newPKP);
         setAccounts(prev => [...prev, newPKP]);
-        setCurrentAccount(newPKP);
+        setuserPKP(newPKP);
       } catch (err) {
         setError(err as Error);
       } finally {
@@ -59,9 +59,9 @@ export default function useAccounts() {
   return {
     fetchAccounts,
     createAccount,
-    setCurrentAccount,
+    setuserPKP,
     accounts,
-    currentAccount,
+    userPKP,
     loading,
     error,
   };

@@ -4,18 +4,21 @@ import { LitActionResource } from '@lit-protocol/auth-helpers';
 import { LitPKPResource } from '@lit-protocol/auth-helpers';
 import { LIT_ABILITY } from '@lit-protocol/constants';
 import { validateSessionSigs } from '@lit-protocol/misc';
+import { LIT_NETWORKS_KEYS } from '@lit-protocol/types';
 import { disconnectWeb3 } from '@lit-protocol/auth-browser';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { SessionSigs, IRelayPKP } from '@lit-protocol/types';
 import { ethers } from 'ethers';
 import AuthenticatedConsentForm from './AuthenticatedConsentForm';
 import { useRouter } from 'next/router';
+import { getPkpNftContract } from '@/utils/get-pkp-nft-contract';
 
 // Define interfaces for the authentication info
 interface AuthInfo {
   type: string;
   authenticatedAt: string;
-  pkp?: IRelayPKP;
+  agentPKP?: IRelayPKP;
+  userPKP?: IRelayPKP;
   value?: string;
 }
 
@@ -48,7 +51,7 @@ const SessionValidator: React.FC = () => {
         console.log('Retrieved auth info:', parsedAuthInfo);
         
         // If we have auth info with a PKP, show the popup
-        if (parsedAuthInfo.pkp) {
+        if (parsedAuthInfo.agentPKP) {
           console.log('Found existing PKP in auth info, will check session validity');
         }
       }
@@ -60,7 +63,7 @@ const SessionValidator: React.FC = () => {
   // Validate session once we have auth info
   useEffect(() => {
     // Skip if we've already checked the session or don't have auth info
-    if (hasCheckedSession || !authInfo || !authInfo.pkp) return;
+    if (hasCheckedSession || !authInfo || !authInfo.agentPKP) return;
     
     const validateSession = async () => {
       try {
@@ -154,7 +157,7 @@ const SessionValidator: React.FC = () => {
   
   // Handle user's choice to use existing account
   const handleUseExistingAccount = async () => {
-    if (sessionSigs && authInfo?.pkp) {
+    if (sessionSigs && authInfo?.agentPKP) {
       // Instead of doing the JWT creation here, show the consent form
       setShowPopup(false);
       setShowConsentForm(true);
@@ -205,7 +208,7 @@ const SessionValidator: React.FC = () => {
       : 'Unknown time';
 
     // Get PKP Ethereum address for display
-    const pkpEthAddress = authInfo.pkp?.ethAddress || 'Not available';
+    const pkpEthAddress = authInfo.agentPKP?.ethAddress || 'Not available';
 
     return (
       <div className="auth-info">
@@ -222,15 +225,14 @@ const SessionValidator: React.FC = () => {
   };
   
   // If showing consent form, render only that
-  if (showConsentForm && sessionSigs && authInfo?.pkp) {
+  if (showConsentForm && sessionSigs && authInfo?.agentPKP && authInfo?.userPKP) {
     return (
       <div className="consent-form-overlay">
         <div className="consent-form-modal">
           <AuthenticatedConsentForm 
-            currentAccount={authInfo.pkp}
+            userPKP={authInfo.userPKP}
+            agentPKP={authInfo.agentPKP}
             sessionSigs={sessionSigs}
-            agentPKP={authInfo.pkp}
-            agentSessionSigs={sessionSigs}
             isSessionValidation={false}
           />
         </div>

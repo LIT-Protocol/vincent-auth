@@ -24,7 +24,6 @@ import {
 import { LitActionResource, LitPKPResource } from '@lit-protocol/auth-helpers';
 import { ethers } from 'ethers';
 import { getPkpNftContract } from './get-pkp-nft-contract';
-import { LitContracts } from '@lit-protocol/contracts-sdk';
 import { addPayee } from './addPayee';
 
 export const DOMAIN = process.env.NEXT_PUBLIC_DOMAIN || 'localhost';
