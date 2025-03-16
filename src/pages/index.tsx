@@ -117,21 +117,7 @@ export default function IndexView() {
         });
         console.log('Agent PKP authentication method:', agentAuthMethod);
 
-        if (referrerUrl) {
-          try {
-            // Removed JWT generation code since it will happen in AuthenticatedConsentForm
-            // after user gives explicit consent
-
-            // Contract calls have been moved to the AuthenticatedConsentForm component
-            console.log('Referrer URL found, contract calls will be handled in AuthenticatedConsentForm');
-          } catch (error) {
-            console.error('Error:', error);
-          }
-        } else {
-          console.log('No referrer URL found, skipping app data lookup');
-        }
-
-        setAgentSessionSigs(sessionSigs);
+        setAgentSessionSigs(sigs);
       } catch (agentError) {
         console.error('Error handling Agent PKP:', agentError);
         // Don't set session error - we can still proceed with just the user PKP
@@ -220,7 +206,7 @@ export default function IndexView() {
         const authInfo = JSON.parse(storedAuthInfo);
 
         // Add PKP info to the existing auth info
-        authInfo.pkp = currentAccount;
+        authInfo.pkp = agentPKP;
         localStorage.setItem('lit-auth-info', JSON.stringify(authInfo));
         console.log('Updated auth info with PKP public keys:', authInfo);
       }

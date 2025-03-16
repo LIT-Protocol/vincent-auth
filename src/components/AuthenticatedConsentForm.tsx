@@ -9,22 +9,7 @@ import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 import { litNodeClient } from '../utils/lit';
 import * as ethers from 'ethers';
 import { LIT_RPC } from '@lit-protocol/constants';
-import APP_FACET_ABI from '../utils/abis/VincentAppViewFacet.abi.json';
-import USER_VIEW_FACET_ABI from '../utils/abis/VincentUserViewFacet.abi.json';
-import USER_FACET_ABI from '../utils/abis/VincentUserFacet.abi.json';
-
-export interface ConsentFormData {
-  delegatees: string[];
-  agentPKP: {
-    tokenId: string;
-    publicKey: string;
-    ethAddress: string;
-  };
-  policyParams?: {
-    [key: string]: string;
-  };
-  roleId?: string;
-}
+import { getAppRegistryContract, getUserViewRegistryContract, getUserRegistryContract } from '../utils/contracts';
 
 interface AuthenticatedConsentFormProps {
   currentAccount: IRelayPKP;
@@ -53,7 +38,6 @@ export default function AuthenticatedConsentForm({
   const router = useRouter();
   const { disconnectAsync } = useDisconnect();
   const { appId, version, error: urlError } = useUrlAppId();
-  const [formData, setFormData] = useState<ConsentFormData | null>(null);
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
   const [showDisapproval, setShowDisapproval] = useState<boolean>(false);
@@ -83,49 +67,19 @@ export default function AuthenticatedConsentForm({
       }
 
       try {
-        const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
-        const userViewRegistryContract = new ethers.Contract(
-          process.env.NEXT_PUBLIC_VINCENT_DATIL_CONTRACT!,
-          USER_VIEW_FACET_ABI,
-          provider
-        );
-        const userRegistryContract = new ethers.Contract(
-          process.env.NEXT_PUBLIC_VINCENT_DATIL_CONTRACT!, 
-          USER_FACET_ABI, 
-          provider
-        );
-        const appRegistryContract = new ethers.Contract(
-          process.env.NEXT_PUBLIC_VINCENT_DATIL_CONTRACT!, 
-          APP_FACET_ABI, 
-          provider
-        );
-
         // Get all permitted app IDs for this PKP
+        const userViewRegistryContract = getUserViewRegistryContract();
         const permittedAppIds = await userViewRegistryContract.getAllPermittedAppIdsForPkp(agentPKP.tokenId);
         console.log('Permitted app IDs for this PKP:', permittedAppIds);
         console.log('Current app ID:', appId);
 
         // Fetch app info and version data
+        const appRegistryContract = getAppRegistryContract();
         const appInfo = await appRegistryContract.getAppById(Number(appId));
         console.log('App info:', appInfo);
         
         // Set the app info state
         setAppInfo(appInfo);
-        
-        // Initialize formData as soon as we have appInfo
-        setFormData({
-          delegatees: [],
-          agentPKP: agentPKP ? {
-            tokenId: agentPKP.tokenId,
-            publicKey: agentPKP.publicKey,
-            ethAddress: agentPKP.ethAddress
-          } : {
-            tokenId: '',
-            publicKey: '',
-            ethAddress: ''
-          },
-          roleId: router.query.roleId as string
-        });
         
         const versionNumber = Number(appInfo.latestVersion);
         console.log('Latest version:', versionNumber);
@@ -139,7 +93,7 @@ export default function AuthenticatedConsentForm({
           toolIpfsCidHashes: versionData.appVersion.toolIpfsCidHashes
         });
         
-        // Try to fetch tool data
+        // Log important data
         console.log("Version data hashes", versionData.appVersion.toolIpfsCidHashes);
         console.log("Agent PKP tokenId", agentPKP.tokenId);
         console.log("App ID", appId);
@@ -202,26 +156,10 @@ export default function AuthenticatedConsentForm({
       if (checkingPermissions) return;
 
       try {
-        // Only initialize formData when we have appInfo
-        if (appInfo && !formData && mounted) {
-          console.log('Setting up form data based on retrieved app info');
+        if (appInfo && mounted) {
+          console.log('App info retrieved');
           
-          // Initialize formData with values from appInfo and agentPKP
-          setFormData({
-            delegatees: [],
-            agentPKP: agentPKP ? {
-              tokenId: agentPKP.tokenId,
-              publicKey: agentPKP.publicKey,
-              ethAddress: agentPKP.ethAddress
-            } : {
-              tokenId: '',
-              publicKey: '',
-              ethAddress: ''
-            },
-            roleId: router.query.roleId as string
-          });
-          
-          // Only set loading to false when we have both appInfo and formData
+          // Only set loading to false when we have appInfo
           setIsLoading(false);
         }
       } catch (err) {
@@ -294,29 +232,17 @@ export default function AuthenticatedConsentForm({
       throw new Error('Missing required data for consent approval');
     }
 
-    const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
-    const userRegistryContract = new ethers.Contract(
-      process.env.NEXT_PUBLIC_VINCENT_DATIL_CONTRACT!, 
-      USER_FACET_ABI, 
-      provider
-    );
+    const userRegistryContract = getUserRegistryContract();
     const userPkpWallet = new PKPEthersWallet({
       controllerSessionSigs: sessionSigs,
       pkpPubKey: currentAccount.publicKey,
       litNodeClient: litNodeClient,
     });
-    
-    // Initialize the wallet
     await userPkpWallet.init();
+    userRegistryContract.connect(userPkpWallet);
     
     // Connect the wallet to the contract and assign it back to a variable
     const connectedContract = userRegistryContract.connect(userPkpWallet);
-
-    console.log("Tool IPFS CID Hashes", versionData.toolIpfsCidHashes);
-    console.log("Agent PKP tokenId", agentPKP.tokenId);
-    console.log("App ID", appId);
-    console.log("App Info latestVersion", appInfo.latestVersion);
-
     // Use the connected contract to send the transaction
     const txResponse = await connectedContract.permitAppVersion(
       agentPKP.tokenId, 
@@ -330,9 +256,6 @@ export default function AuthenticatedConsentForm({
         gasLimit: 1000000
       }
     );
-    
-    console.log('Transaction response:', txResponse);
-    
     // Wait for the transaction to be mined
     const receipt = await txResponse.wait();
     console.log('Transaction receipt:', receipt);
@@ -454,8 +377,6 @@ export default function AuthenticatedConsentForm({
   };
 
   const handleApprove = useCallback(async () => {
-    if (!formData) return;
-    
     // Add debugging to check versionData
     console.log('handleApprove called with versionData:', versionData);
     
@@ -475,7 +396,7 @@ export default function AuthenticatedConsentForm({
     } finally {
       setSubmitting(false);
     }
-  }, [formData, versionData]);
+  }, [versionData]);
 
   // If the app is already permitted, show a brief loading spinner or success animation
   if (isAppAlreadyPermitted || (showSuccess && checkingPermissions)) {
@@ -521,17 +442,6 @@ export default function AuthenticatedConsentForm({
       <div className="consent-form-container">
         <div className="alert alert--error">
           <p>{urlError}</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Only show this error if we're not loading and the data is still missing
-  if (!formData || !appInfo || !versionData) {
-    return (
-      <div className="consent-form-container">
-        <div className="alert alert--error">
-          <p>Unable to load consent form data</p>
         </div>
       </div>
     );
