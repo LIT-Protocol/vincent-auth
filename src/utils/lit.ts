@@ -47,7 +47,6 @@ const litRelay = new LitRelay({
   relayUrl: LitRelay.getRelayUrl(SELECTED_LIT_NETWORK),
   relayApiKey: 'test-api-key',
 });
-console.log('litRelay', litRelay);
 
 /**
  * Setting all available providers
@@ -105,7 +104,7 @@ function getStytchEmailOtpProvider() {
         relay: litRelay,
         litNodeClient,
       },
-      { appId: "project-test-6391e066-3ed1-447c-bb56-982e7e38e19a" },
+      { appId: process.env.NEXT_PUBLIC_STYTCH_PROJECT_ID || '' },
       'email',
     );
   }
@@ -119,7 +118,7 @@ function getStytchSmsOtpProvider() {
         relay: litRelay,
         litNodeClient,
       },
-      { appId: "project-test-6391e066-3ed1-447c-bb56-982e7e38e19a" },
+      { appId: process.env.NEXT_PUBLIC_STYTCH_PROJECT_ID || '' },
       'sms',
     );
   }
@@ -263,23 +262,13 @@ export async function cleanupSession(): Promise<void> {
 /**
  * Fetch PKPs associated with given auth method, minting one if none exist
  */
-export async function getPKPs(authMethod: AuthMethod): Promise<IRelayPKP[]> {
+export async function getOrMintPKPs(authMethod: AuthMethod): Promise<IRelayPKP[]> {
   const provider = getAuthenticatedProvider(authMethod);
   let allPKPs = await provider.fetchPKPsThroughRelayer(authMethod);
-  console.log('Initial PKPs:', allPKPs);
-
-  // If no PKPs found and not WebAuthn (which handles registration separately),
-  // automatically mint one
   if (allPKPs.length === 0 && authMethod.authMethodType !== AUTH_METHOD_TYPE.WebAuthn) {
-    console.log('No PKPs found, minting new one...');
     const newPKP = await mintPKP(authMethod);
-    console.log('Minted new PKP:', newPKP);
-    const newPKP2 = await mintPKPToExistingPKP(newPKP);
-    console.log("second PKP minted", newPKP2);
-
-    // Fetch PKPs again to get the complete list
+    await mintPKPToExistingPKP(newPKP);
     allPKPs = await provider.fetchPKPsThroughRelayer(authMethod);
-    console.log('Final PKPs:', allPKPs);
   }
 
   return allPKPs;

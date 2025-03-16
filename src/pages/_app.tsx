@@ -35,8 +35,8 @@ const client = createClient({
 });
 
 const stytch = createStytchUIClient(
-  "public-token-test-a131d94f-c829-4421-8fe2-3820b462e71c"
-);
+  process.env.NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN || ''
+)
 
 const font = Albert_Sans({ subsets: ['latin'] });
 

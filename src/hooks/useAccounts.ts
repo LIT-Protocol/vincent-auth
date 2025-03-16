@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { AuthMethod } from '@lit-protocol/types';
-import { getPKPs, mintPKP } from '../utils/lit';
+import { getOrMintPKPs, mintPKP } from '../utils/lit';
 import { IRelayPKP } from '@lit-protocol/types';
 
 export default function useAccounts() {
@@ -18,7 +18,7 @@ export default function useAccounts() {
       setError(undefined);
       try {
         // Fetch PKPs tied to given auth method
-        const myPKPs = await getPKPs(authMethod);
+        const myPKPs = await getOrMintPKPs(authMethod);
         // console.log('fetchAccounts pkps: ', myPKPs);
         setAccounts(myPKPs);
         // If only one PKP, set as current account

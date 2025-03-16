@@ -4,16 +4,15 @@ import { IRelayPKP, SessionSigs } from '@lit-protocol/types';
 import { VincentSDK } from '@lit-protocol/vincent-sdk';
 import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
 
-import { cleanupSession } from '../utils/lit';
-import { useDisconnect } from 'wagmi';
-import { useUrlAppId } from '../hooks/useUrlAppId';
-import { litNodeClient } from '../utils/lit';
+import { cleanupSession } from '@/utils/lit';
+import { useUrlAppId } from '@/hooks/useUrlAppId';
+import { litNodeClient } from '@/utils/lit';
 import * as ethers from 'ethers';
 import {
   getAppRegistryContract,
   getUserViewRegistryContract,
   getUserRegistryContract,
-} from '../utils/contracts';
+} from '@/utils/contracts';
 
 interface AuthenticatedConsentFormProps {
   userPKP: IRelayPKP;
@@ -39,7 +38,6 @@ export default function AuthenticatedConsentForm ({
   userPKP,
 }: AuthenticatedConsentFormProps) {
   const router = useRouter();
-  const { disconnectAsync } = useDisconnect();
   const { appId, version, error: urlError } = useUrlAppId();
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [showSuccess, setShowSuccess] = useState<boolean>(false);
@@ -54,6 +52,219 @@ export default function AuthenticatedConsentForm ({
   const [checkingPermissions, setCheckingPermissions] = useState<boolean>(true);
   const [versionData, setVersionData] = useState<any>(null);
 
+  // ===== JWT and Redirect Functions =====
+  
+  // Generate JWT for redirection
+  const generateJWT = async (): Promise<string | null> => {
+    if (!agentPKP || !referrerUrl) {
+      console.log('Cannot generate JWT: missing agentPKP or referrerUrl');
+      return null;
+    }
+
+    try {
+      console.log('Initializing agent PKP wallet for JWT creation...');
+      const agentPkpWallet = new PKPEthersWallet({
+        controllerSessionSigs: sessionSigs,
+        pkpPubKey: agentPKP.publicKey,
+        litNodeClient: litNodeClient,
+      });
+      await agentPkpWallet.init();
+
+      const vincent = new VincentSDK();
+      const jwt = await vincent.createSignedJWT({
+        pkpWallet: agentPkpWallet as any,
+        pkp: agentPKP,
+        payload: { name: 'User Name', customClaim: 'value' },
+        expiresInMinutes: 30,
+        audience: referrerUrl,
+      });
+
+      if (jwt) {
+        console.log('JWT created successfully:', jwt);
+        // Store the JWT in state for reuse if needed
+        setGeneratedJwt(jwt);
+        return jwt;
+      }
+    } catch (error) {
+      console.error('Error creating JWT:', error);
+    }
+
+    return null;
+  };
+
+  // Redirect with JWT
+  const redirectWithJWT = async (jwt: string | null) => {
+    if (!referrerUrl) {
+      console.error('No referrer URL available for redirect');
+      return;
+    }
+
+    // Use the provided JWT or the one stored in state
+    const jwtToUse = jwt || generatedJwt;
+
+    if (jwtToUse) {
+      console.log('Redirecting with JWT:', jwtToUse);
+      try {
+        const redirectUrl = new URL(referrerUrl);
+        redirectUrl.searchParams.set('jwt', jwtToUse);
+        window.location.href = redirectUrl.toString();
+      } catch (error) {
+        console.error('Error creating redirect URL:', error);
+        window.location.href = referrerUrl;
+      }
+    } else {
+      console.log('No JWT available, redirecting without JWT');
+      window.location.href = referrerUrl;
+    }
+  };
+
+  // ===== Consent Approval Functions =====
+  
+  // Approve consent on the blockchain
+  const approveConsent = async () => {
+    if (!agentPKP || !appId || !appInfo || !versionData) {
+      console.error('Missing required data for consent approval');
+      throw new Error('Missing required data for consent approval');
+    }
+
+    const userRegistryContract = getUserRegistryContract();
+    const userPkpWallet = new PKPEthersWallet({
+      controllerSessionSigs: sessionSigs,
+      pkpPubKey: userPKP.publicKey,
+      litNodeClient: litNodeClient,
+    });
+    await userPkpWallet.init();
+    userRegistryContract.connect(userPkpWallet);
+
+    // Connect the wallet to the contract and assign it back to a variable
+    const connectedContract = userRegistryContract.connect(userPkpWallet);
+    // Use the connected contract to send the transaction
+    const txResponse = await connectedContract.permitAppVersion(
+      agentPKP.tokenId,
+      appId,
+      Number(appInfo.latestVersion),
+      versionData.toolIpfsCidHashes,
+      [[]],
+      [[[]]],
+      [[[]]],
+      {
+        gasLimit: 1000000,
+      }
+    );
+
+    const receipt = await txResponse.wait();
+    console.log('Transaction receipt:', receipt);
+
+    return receipt;
+  };
+
+  // Form submission logic extracted from FormSubmission component
+  const handleFormSubmission = async (): Promise<{ success: boolean }> => {
+    try {
+      // Debug log to check versionData before proceeding
+      console.log('Version data before consent approval:', versionData);
+
+      // First check if we have all required data
+      if (!versionData || !versionData.toolIpfsCidHashes) {
+        console.error(
+          'Missing version data or tool IPFS CID hashes in handleFormSubmission'
+        );
+        setError('Missing version data. Please try again.');
+        return { success: false };
+      }
+
+      if (!agentPKP || !appId || !appInfo) {
+        console.error(
+          'Missing required data for consent approval in handleFormSubmission'
+        );
+        setError('Missing required data. Please try again.');
+        return { success: false };
+      }
+
+      // First approve the consent
+      await approveConsent();
+
+      // Then generate JWT after successful consent approval
+      const jwt = await generateJWT();
+
+      // Show success animation
+      setShowSuccess(true);
+
+      // Wait for the animation to play before redirecting
+      setTimeout(() => {
+        redirectWithJWT(jwt);
+      }, 2000); // Animation display time
+
+      return {
+        success: true,
+      };
+    } catch (error) {
+      console.error('Error processing transaction:', {
+        error,
+        errorCode: (error as any).code,
+        errorMessage: (error as any).message,
+        errorReason: (error as any).reason,
+        errorData: (error as any).data,
+      });
+      setError('An error occurred while processing your request');
+      throw error;
+    }
+  };
+
+  // ===== Event Handler Functions =====
+  
+  const handleApprove = useCallback(async () => {
+    // Add debugging to check versionData
+    console.log('handleApprove called with versionData:', versionData);
+
+    if (!versionData || !versionData.toolIpfsCidHashes) {
+      console.error('Missing version data in handleApprove');
+      setError('Missing version data. Please refresh the page and try again.');
+      setSubmitting(false);
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await handleFormSubmission();
+    } catch (err) {
+      console.error('Error submitting form:', err);
+      setError('Failed to submit approval');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [versionData]);
+
+  const handleLogout = useCallback(async () => {
+    try {
+      await cleanupSession();
+      // Redirect to referrer URL if available
+      if (referrerUrl) {
+        window.location.href = referrerUrl;
+      }
+    } catch (err) {
+      console.error('Error during logout:', err);
+    }
+  }, [referrerUrl]);
+
+  const handleDisapprove = useCallback(async () => {
+    setShowDisapproval(true);
+
+    // Wait for animation to complete before redirecting
+    setTimeout(() => {
+      // Then wait a moment before redirecting
+      setTimeout(() => {
+        // Redirect to the referrer URL without the JWT
+        if (referrerUrl) {
+          window.location.href = referrerUrl;
+        }
+      }, 100); // Small delay to ensure callback completes
+    }, 2000); // Animation display time
+  }, [handleLogout, referrerUrl]);
+
+  // ===== Data Loading Effects =====
+  
+  // Load referrer URL from session storage
   useEffect(() => {
     const storedReferrerUrl = sessionStorage.getItem('referrerUrl');
     if (storedReferrerUrl) {
@@ -180,210 +391,8 @@ export default function AuthenticatedConsentForm ({
     };
   }, [appId, agentPKP, router.query.roleId, isAppAlreadyPermitted, appInfo]);
 
-  const handleLogout = useCallback(async () => {
-    try {
-      await disconnectAsync();
-      await cleanupSession();
-      // Redirect to referrer URL if available
-      if (referrerUrl) {
-        window.location.href = referrerUrl;
-      }
-    } catch (err) {
-      console.error('Error during logout:', err);
-    }
-  }, [disconnectAsync, referrerUrl]);
-
-  const handleDisapprove = useCallback(async () => {
-    setShowDisapproval(true);
-
-    // Wait for animation to complete before redirecting
-    setTimeout(() => {
-      // Then wait a moment before redirecting
-      setTimeout(() => {
-        // Redirect to the referrer URL without the JWT
-        if (referrerUrl) {
-          window.location.href = referrerUrl;
-        }
-      }, 100); // Small delay to ensure callback completes
-    }, 2000); // Animation display time
-  }, [handleLogout, referrerUrl]);
-
-  const approveConsent = async () => {
-    if (!agentPKP || !appId || !appInfo || !versionData) {
-      console.error('Missing required data for consent approval');
-      throw new Error('Missing required data for consent approval');
-    }
-
-    const userRegistryContract = getUserRegistryContract();
-    const userPkpWallet = new PKPEthersWallet({
-      controllerSessionSigs: sessionSigs,
-      pkpPubKey: userPKP.publicKey,
-      litNodeClient: litNodeClient,
-    });
-    await userPkpWallet.init();
-    userRegistryContract.connect(userPkpWallet);
-
-    // Connect the wallet to the contract and assign it back to a variable
-    const connectedContract = userRegistryContract.connect(userPkpWallet);
-    // Use the connected contract to send the transaction
-    const txResponse = await connectedContract.permitAppVersion(
-      agentPKP.tokenId,
-      appId,
-      Number(appInfo.latestVersion),
-      versionData.toolIpfsCidHashes,
-      [[]],
-      [[[]]],
-      [[[]]],
-      {
-        gasLimit: 1000000,
-      }
-    );
-
-    const receipt = await txResponse.wait();
-    console.log('Transaction receipt:', receipt);
-
-    return receipt;
-  };
-
-  // Generate JWT for redirection
-  const generateJWT = async (): Promise<string | null> => {
-    if (!agentPKP || !referrerUrl) {
-      console.log('Cannot generate JWT: missing agentPKP or referrerUrl');
-      return null;
-    }
-
-    try {
-      console.log('Initializing agent PKP wallet for JWT creation...');
-      const agentPkpWallet = new PKPEthersWallet({
-        controllerSessionSigs: sessionSigs,
-        pkpPubKey: agentPKP.publicKey,
-        litNodeClient: litNodeClient,
-      });
-      await agentPkpWallet.init();
-
-      const vincent = new VincentSDK();
-      const jwt = await vincent.createSignedJWT({
-        pkpWallet: agentPkpWallet as any,
-        pkp: agentPKP,
-        payload: { name: 'User Name', customClaim: 'value' },
-        expiresInMinutes: 30,
-        audience: referrerUrl,
-      });
-
-      if (jwt) {
-        console.log('JWT created successfully:', jwt);
-        // Store the JWT in state for reuse if needed
-        setGeneratedJwt(jwt);
-        return jwt;
-      }
-    } catch (error) {
-      console.error('Error creating JWT:', error);
-    }
-
-    return null;
-  };
-
-  // Redirect with JWT
-  const redirectWithJWT = async (jwt: string | null) => {
-    if (!referrerUrl) {
-      console.error('No referrer URL available for redirect');
-      return;
-    }
-
-    // Use the provided JWT or the one stored in state
-    const jwtToUse = jwt || generatedJwt;
-
-    if (jwtToUse) {
-      console.log('Redirecting with JWT:', jwtToUse);
-      try {
-        const redirectUrl = new URL(referrerUrl);
-        redirectUrl.searchParams.set('jwt', jwtToUse);
-        window.location.href = redirectUrl.toString();
-      } catch (error) {
-        console.error('Error creating redirect URL:', error);
-        window.location.href = referrerUrl;
-      }
-    } else {
-      console.log('No JWT available, redirecting without JWT');
-      window.location.href = referrerUrl;
-    }
-  };
-
-  // Form submission logic extracted from FormSubmission component
-  const handleFormSubmission = async (): Promise<{ success: boolean }> => {
-    try {
-      // Debug log to check versionData before proceeding
-      console.log('Version data before consent approval:', versionData);
-
-      // First check if we have all required data
-      if (!versionData || !versionData.toolIpfsCidHashes) {
-        console.error(
-          'Missing version data or tool IPFS CID hashes in handleFormSubmission'
-        );
-        setError('Missing version data. Please try again.');
-        return { success: false };
-      }
-
-      if (!agentPKP || !appId || !appInfo) {
-        console.error(
-          'Missing required data for consent approval in handleFormSubmission'
-        );
-        setError('Missing required data. Please try again.');
-        return { success: false };
-      }
-
-      // First approve the consent
-      await approveConsent();
-
-      // Then generate JWT after successful consent approval
-      const jwt = await generateJWT();
-
-      // Show success animation
-      setShowSuccess(true);
-
-      // Wait for the animation to play before redirecting
-      setTimeout(() => {
-        redirectWithJWT(jwt);
-      }, 2000); // Animation display time
-
-      return {
-        success: true,
-      };
-    } catch (error) {
-      console.error('Error processing transaction:', {
-        error,
-        errorCode: (error as any).code,
-        errorMessage: (error as any).message,
-        errorReason: (error as any).reason,
-        errorData: (error as any).data,
-      });
-      setError('An error occurred while processing your request');
-      throw error;
-    }
-  };
-
-  const handleApprove = useCallback(async () => {
-    // Add debugging to check versionData
-    console.log('handleApprove called with versionData:', versionData);
-
-    if (!versionData || !versionData.toolIpfsCidHashes) {
-      console.error('Missing version data in handleApprove');
-      setError('Missing version data. Please refresh the page and try again.');
-      setSubmitting(false);
-      return;
-    }
-
-    setSubmitting(true);
-    try {
-      await handleFormSubmission();
-    } catch (err) {
-      console.error('Error submitting form:', err);
-      setError('Failed to submit approval');
-    } finally {
-      setSubmitting(false);
-    }
-  }, [versionData]);
-
+  // ===== Render Logic =====
+  
   // If the app is already permitted, show a brief loading spinner or success animation
   if (isAppAlreadyPermitted || (showSuccess && checkingPermissions)) {
     return (

@@ -12,26 +12,21 @@ export default function WebAuthn({
   registerWithWebAuthn,
 }: WebAuthnProps) {
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<Error>();
 
   async function handleRegister() {
     if (!registerWithWebAuthn) {
-      setError(new Error('Registration is not available'));
       return;
     }
-    setError(undefined);
     setLoading(true);
     try {
       await registerWithWebAuthn();
     } catch (err) {
       console.error(err);
-      setError(err as Error);
     }
     setLoading(false);
   }
 
   async function handleAuthenticate() {
-    setError(undefined);
     setLoading(true);
     try {
       await authWithWebAuthn();
@@ -52,7 +47,6 @@ export default function WebAuthn({
       
     } catch (err) {
       console.error(err);
-      setError(err as Error);
     }
     setLoading(false);
   }

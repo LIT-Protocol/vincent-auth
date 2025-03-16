@@ -19,14 +19,11 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
   const [methodId, setMethodId] = useState<string>('');
   const [code, setCode] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
-  const [error, setError] = useState<Error>();
-
   const stytchClient = useStytch();
 
   async function sendPasscode(event: any) {
     event.preventDefault();
     setLoading(true);
-    setError(undefined);
     try {
       let response;
       if (method === 'email') {
@@ -40,7 +37,6 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
       setMethodId(response.method_id);
       setStep('verify');
     } catch (err) {
-      setError(err as Error);
     } finally {
       setLoading(false);
     }
@@ -49,7 +45,6 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
   async function authenticate(event: any) {
     event.preventDefault();
     setLoading(true);
-    setError(undefined);
     try {
       const response = await stytchClient.otps.authenticate(code, methodId, {
         session_duration_minutes: 60,
@@ -70,7 +65,6 @@ const StytchOTP = ({ method, authWithStytch, setView }: StytchOTPProps) => {
       
       await authWithStytch(response.session_jwt, response.user_id, method);
     } catch (err) {
-      setError(err as Error);
     } finally {
       setLoading(false);
     }
