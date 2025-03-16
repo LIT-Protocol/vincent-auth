@@ -278,6 +278,22 @@ export default function AuthenticatedConsentForm({
   }, [handleLogout, referrerUrl]);
 
   const approveConsent = async () => {
+    // Add more detailed debugging
+    console.log('approveConsent called with versionData:', versionData);
+    console.log('versionData type:', typeof versionData);
+    console.log('versionData keys:', versionData ? Object.keys(versionData) : 'null');
+    
+    // Check if required data is available
+    if (!versionData || !versionData.toolIpfsCidHashes) {
+      console.error('Missing version data or tool IPFS CID hashes');
+      throw new Error('Missing version data or tool IPFS CID hashes');
+    }
+
+    if (!agentPKP || !appId || !appInfo) {
+      console.error('Missing required data for consent approval');
+      throw new Error('Missing required data for consent approval');
+    }
+
     const provider = new ethers.providers.JsonRpcProvider(LIT_RPC.CHRONICLE_YELLOWSTONE);
     const userRegistryContract = new ethers.Contract(
       process.env.NEXT_PUBLIC_VINCENT_DATIL_CONTRACT!, 
@@ -289,18 +305,39 @@ export default function AuthenticatedConsentForm({
       pkpPubKey: currentAccount.publicKey,
       litNodeClient: litNodeClient,
     });
-    userRegistryContract.connect(userPkpWallet)
+    
+    // Initialize the wallet
+    await userPkpWallet.init();
+    
+    // Connect the wallet to the contract and assign it back to a variable
+    const connectedContract = userRegistryContract.connect(userPkpWallet);
 
-    const txHash = await userRegistryContract.permitAppVersion(agentPKP!.tokenId, appId, Number(appInfo!.latestVersion), versionData.toolIpfsCidHashes, [[]], [[[]]], [[[]]], {
-      gasLimit: 1000000
-    })
-    console.log('Transaction hash:', txHash);
-    const tx = await provider.getTransaction(txHash);
-    console.log('Transaction:', tx);
-    const receipt = await tx.wait();
-    console.log('Receipt:', receipt);
+    console.log("Tool IPFS CID Hashes", versionData.toolIpfsCidHashes);
+    console.log("Agent PKP tokenId", agentPKP.tokenId);
+    console.log("App ID", appId);
+    console.log("App Info latestVersion", appInfo.latestVersion);
 
-
+    // Use the connected contract to send the transaction
+    const txResponse = await connectedContract.permitAppVersion(
+      agentPKP.tokenId, 
+      appId, 
+      Number(appInfo.latestVersion), 
+      versionData.toolIpfsCidHashes, 
+      [[]], 
+      [[[]]], 
+      [[[]]], 
+      {
+        gasLimit: 1000000
+      }
+    );
+    
+    console.log('Transaction response:', txResponse);
+    
+    // Wait for the transaction to be mined
+    const receipt = await txResponse.wait();
+    console.log('Transaction receipt:', receipt);
+    
+    return receipt;
   }
   
   // Generate JWT for redirection
@@ -321,7 +358,7 @@ export default function AuthenticatedConsentForm({
 
       const vincent = new VincentSDK();
       const jwt = await vincent.createSignedJWT({
-        pkpWallet: agentPkpWallet,
+        pkpWallet: agentPkpWallet as any,
         pkp: agentPKP,
         payload: { name: "User Name", customClaim: "value" },
         expiresInMinutes: 30,
@@ -370,9 +407,27 @@ export default function AuthenticatedConsentForm({
   // Form submission logic extracted from FormSubmission component
   const handleFormSubmission = async (): Promise<{success: boolean}> => {
     try {
-      // Generate JWT - this is now the only place JWT generation happens in the app
-      const jwt = await generateJWT();
+      // Debug log to check versionData before proceeding
+      console.log('Version data before consent approval:', versionData);
+      
+      // First check if we have all required data
+      if (!versionData || !versionData.toolIpfsCidHashes) {
+        console.error('Missing version data or tool IPFS CID hashes in handleFormSubmission');
+        setError('Missing version data. Please try again.');
+        return { success: false };
+      }
+
+      if (!agentPKP || !appId || !appInfo) {
+        console.error('Missing required data for consent approval in handleFormSubmission');
+        setError('Missing required data. Please try again.');
+        return { success: false };
+      }
+      
+      // First approve the consent
       await approveConsent();
+      
+      // Then generate JWT after successful consent approval
+      const jwt = await generateJWT();
 
       // Show success animation
       setShowSuccess(true);
@@ -400,6 +455,17 @@ export default function AuthenticatedConsentForm({
 
   const handleApprove = useCallback(async () => {
     if (!formData) return;
+    
+    // Add debugging to check versionData
+    console.log('handleApprove called with versionData:', versionData);
+    
+    if (!versionData || !versionData.toolIpfsCidHashes) {
+      console.error('Missing version data in handleApprove');
+      setError('Missing version data. Please refresh the page and try again.');
+      setSubmitting(false);
+      return;
+    }
+    
     setSubmitting(true);
     try {
       await handleFormSubmission();
@@ -409,7 +475,7 @@ export default function AuthenticatedConsentForm({
     } finally {
       setSubmitting(false);
     }
-  }, [formData]);
+  }, [formData, versionData]);
 
   // If the app is already permitted, show a brief loading spinner or success animation
   if (isAppAlreadyPermitted || (showSuccess && checkingPermissions)) {
@@ -461,7 +527,7 @@ export default function AuthenticatedConsentForm({
   }
 
   // Only show this error if we're not loading and the data is still missing
-  if (!formData || !appInfo) {
+  if (!formData || !appInfo || !versionData) {
     return (
       <div className="consent-form-container">
         <div className="alert alert--error">

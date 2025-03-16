@@ -15,6 +15,7 @@
     "@lit-protocol/contracts-sdk": "^7.0.6",
     "@lit-protocol/lit-auth-client": "^7.0.0",
     "@lit-protocol/lit-node-client": "^7.0.0",
+    "@lit-protocol/misc": "^7.0.8",
     "@lit-protocol/pkp-ethers": "^7.0.0",
     "@lit-protocol/types": "^7.0.0",
     "@lit-protocol/vincent-sdk": "^0.1.0-5",
