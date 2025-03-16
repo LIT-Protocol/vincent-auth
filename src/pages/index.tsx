@@ -1,26 +1,23 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
+import { AUTH_METHOD_TYPE } from '@lit-protocol/constants';
+import { SessionSigs, IRelayPKP } from '@lit-protocol/types';
+
 import useAuthenticate from '../hooks/useAuthenticate';
 import useAccounts from '../hooks/useAccounts';
-import { registerWebAuthn, getSessionSigs, cleanupSession, litNodeClient } from '../utils/lit';
-import { AUTH_METHOD_TYPE } from '@lit-protocol/constants';
+import { registerWebAuthn, getSessionSigs, cleanupSession } from '../utils/lit';
 import AuthenticatedConsentForm from '../components/AuthenticatedConsentForm';
 import Loading from '../components/Loading';
 import LoginMethods from '../components/LoginMethods';
-import { SessionSigs, IRelayPKP } from '@lit-protocol/types';
-import { PKPEthersWallet } from '@lit-protocol/pkp-ethers';
-import { EthWalletProvider } from '@lit-protocol/lit-auth-client';
 import { getAgentPKP } from '../utils/getAgentPKP';
 
 export default function IndexView() {
   const router = useRouter();
   const { managementWallet, roleId } = router.query;
   const [sessionSigs, setSessionSigs] = useState<SessionSigs>();
-  const [agentSessionSigs, setAgentSessionSigs] = useState<SessionSigs>();
   const [agentPKP, setAgentPKP] = useState<IRelayPKP>();
   const [sessionLoading, setSessionLoading] = useState<boolean>(false);
   const [sessionError, setSessionError] = useState<Error>();
-  const [referrerUrl, setReferrerUrl] = useState<string | null>(null);
 
   const {
     authMethod,
@@ -46,8 +43,6 @@ export default function IndexView() {
     // Get the document referrer (the URL the user came from)
     const referrer = document.referrer;
     if (referrer && referrer !== '') {
-      setReferrerUrl(referrer);
-      // Also store in sessionStorage in case we need it elsewhere
       sessionStorage.setItem('referrerUrl', referrer);
     }
   }, []);
@@ -70,10 +65,8 @@ export default function IndexView() {
       try {
         const agentPkpInfo = await getAgentPKP(userPKP.ethAddress);
         setAgentPKP(agentPkpInfo);
-        setAgentSessionSigs(sigs);
       } catch (agentError) {
         console.error('Error handling Agent PKP:', agentError);
-        // Don't set session error - we can still proceed with just the user PKP
       }
     } catch (err) {
       setSessionError(err as Error);
